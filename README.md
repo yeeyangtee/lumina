@@ -8,9 +8,10 @@ Open: **http://192.168.0.110:5050**
 
 ## First review
 
-The first visit opens a one-time setup screen. Create the administrator account
-with your preferred username and a password of at least 8 characters. There is
-no public registration.
+Initial administrator setup has been completed on yy-visionmini. Sign in with the
+account created by the owner. On a fresh installation, the first visit instead
+opens the one-time setup screen; its password minimum is eight characters and
+there is no public registration.
 
 After setup:
 
@@ -22,8 +23,9 @@ After setup:
 - Admin shows users, scans, background processing coverage, and job controls.
 - Account lets each user change their password and sign out.
 
-Visual search and video posters progressively improve while their first low-
-priority background passes complete. Normal browsing remains available.
+The initial metadata, visual-search, and video-poster passes are complete. A small
+set of unreadable media remains in explicit error state and uses normal fallback
+behavior; see `ROADMAP.md` for current counts.
 
 ## Mobile use
 
@@ -117,14 +119,16 @@ Verified online backups are stored under:
 
     ~/.cache/nfs_image_viewer/backups/library-YYYYMMDD-HHMMSS.db
 
-Fourteen scheduled copies are retained. A pre-wave migration snapshot is also
-kept. To make a fresh backup:
+Up to fourteen scheduled copies are retained. A pre-wave migration snapshot is
+also kept. To make a fresh backup:
 
     systemctl --user start nfs-image-viewer-backup.service
 
 Before restoring, stop the web and all database-writing jobs, preserve the current
 library.db, copy the selected verified backup into its place with mode 0600, and
 restart the services. Do not restore while an index/enrichment job is running.
+These backups are stored on the same machine as the live database; copy them to a
+second trusted device if protection from disk or machine loss is required.
 
 ## Tests
 
@@ -137,5 +141,5 @@ production catalogue.
 
 ## Current status
 
-See ROADMAP.md for live first-pass enrichment/poster/embedding progress and
-intentionally deferred items such as UFW, trusted local HTTPS, OCR, and faces.
+See `ROADMAP.md` for shipped and deferred product work. Maintainers and future AI
+agents should begin with `HANDOVER.md`, then read `AGENTS.md` before editing.

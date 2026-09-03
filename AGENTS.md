@@ -4,6 +4,9 @@ Private, authenticated Flask photo/video library hosted on **yy-visionmini**
 (Ubuntu). Media is read from a slow SMB mount; every request-path design should
 minimize NAS round-trips. Derived data and all user state stay local.
 
+Start every new maintenance session with `HANDOVER.md`; it records the live
+deployment state, owner decisions, reviewed limitations, and next-step order.
+
 ## Production topology
 
 - Web: Gunicorn on 0.0.0.0:5050, systemd user unit nfs-image-viewer.service.
@@ -15,6 +18,7 @@ minimize NAS round-trips. Derived data and all user state stay local.
 
 ## Code map
 
+- HANDOVER.md — current deployment snapshot, reviewed risks, and next-step order.
 - app.py — routes, browse/viewer, thumbnails, search proxy, favorites/albums.
 - auth.py — setup/login/session/CSRF/account/admin and fixed job triggers.
 - config.py — environment-driven collection paths.
@@ -103,15 +107,20 @@ or account passwords in this repository.
 - nfs-image-viewer-backup.timer — daily verified backup, 14-copy retention.
 - nfs-image-viewer-semantic.service — always-on loopback inference.
 
-All derivation workers are idempotent and process only pending rows. Corrupt files
-become error state instead of aborting the whole run. Use Nice and idle I/O class
-for NAS/CPU-heavy jobs so browsing stays responsive.
+All derivation workers are idempotent and normally process only pending rows.
+Corrupt files become error state instead of aborting the whole run; errors require
+an explicit `--retry-errors` CLI run. A later no-op run may set `job_state` to
+`ready 0/0`, so use status-column counts for true coverage. Use Nice and idle I/O
+class for NAS/CPU-heavy jobs so browsing stays responsive.
 
 ## Test and verify
 
     .venv/bin/python -m unittest discover -s tests -v
-    .venv/bin/python -m py_compile app.py auth.py catalog.py scanner.py enrich.py
+    .venv/bin/python -m py_compile app.py auth.py backup.py catalog.py config.py \
+      enrich.py media_cache.py posters.py scanner.py semantic_index.py \
+      semantic_model.py semantic_server.py
     node --check static/gallery.js
+    node --check static/sw.js
     curl http://127.0.0.1:5050/healthz
     curl http://127.0.0.1:5051/healthz
 

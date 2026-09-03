@@ -28,7 +28,7 @@ Status: ☐ todo · ◐ building/indexing · ☑ shipped · ⏸ intentionally on
 - ☑ Per-user named albums with add/remove actions from the viewer.
 - ☑ Admin dashboard for users, scan state, enrichment coverage, and job triggers.
 
-## Wave 2 — Rich and semantic search ◐
+## Wave 2 — Rich and semantic search ☑
 
 - ☑ Background EXIF enrichment: capture date/year, camera, lens, dimensions, GPS.
 - ☑ Initial metadata enrichment completed across all 23,385 items; periodic
@@ -39,8 +39,9 @@ Status: ☐ todo · ◐ building/indexing · ☑ shipped · ⏸ intentionally on
 - ☑ Normalized 512-dimensional image embeddings stored locally in SQLite.
 - ☑ Natural-language visual similarity search with structured filters.
 - ☑ Model identity and per-item embedding state support safe rebuilds.
-- ◐ Initial semantic index is building at low priority; new items are handled by
-  the hourly timer.
+- ☑ Initial semantic pass completed: 23,350 embeddings are ready; 24 unreadable
+  JPGs are recorded as errors and 11 videos await posters. New items are handled
+  by the hourly timer.
 - ☐ Optional future enrichment: OCR and opt-in face naming/clustering.
 - ☐ Optional similarity view for perceptual duplicate review.
 
@@ -60,11 +61,12 @@ Status: ☐ todo · ◐ building/indexing · ☑ shipped · ⏸ intentionally on
 - ⏸ Service-worker activation on LAN IP requires trusted local HTTPS; the HTTP app
   remains fully usable and can still be added as a home-screen shortcut.
 
-## Wave 4 — Operations and media finishing ◐
+## Wave 4 — Operations and media finishing ☑
 
 - ☑ Real video poster generation via bundled local ffmpeg—no apt dependency.
-- ◐ Initial poster extraction for existing videos is building at low I/O priority;
-  hourly processing handles the remainder and future videos.
+- ☑ Initial poster pass completed: 1,595 of 1,606 videos have posters; 11 MP4s
+  that produced no frame are recorded as errors. Hourly processing handles new
+  videos.
 - ☑ Consistent SQLite online backup with integrity verification and 14-copy
   retention, scheduled daily at approximately 03:20.
 - ☑ Admin-visible background-job progress/errors and manual job triggers.
@@ -78,16 +80,19 @@ Status: ☐ todo · ◐ building/indexing · ☑ shipped · ⏸ intentionally on
 ## Review-build acceptance
 
 - ☑ Live at http://192.168.0.110:5050.
-- ☑ One-time admin setup is ready.
+- ☑ One-time admin setup completed; the owner account exists.
 - ☑ Existing media catalogue preserved: 23,385 items.
 - ☑ Pre-migration and post-migration verified database backups exist.
 - ☑ Core test suite, template compilation, JavaScript syntax, health, and live
   semantic query checks pass.
-- ◐ Metadata, semantic, and poster coverage continue filling in without blocking
-  normal browsing or review.
+- ☑ First-pass derived data completed. Exceptional files remain isolated in error
+  state without blocking normal browsing or review.
 
 ## Changelog
 
+- **2026-09-03 — maintenance handover:** reviewed code, documentation, live
+  services, database integrity, tests, and remaining media exceptions; added
+  `HANDOVER.md` and updated first-pass indexing status.
 - **2026-09-03 — simpler passwords:** lowered the minimum account password length
   to eight characters across setup, administration, account changes, and tests.
 - **2026-09-03 — review build:** shipped accounts, per-user favorites/albums,
