@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Favorites — Lumina{% endblock %}
+{% block content %}<div class="page-title"><div><p class="eyebrow">Your picks</p><h1>Favorites</h1><p class="lede">The moments you never want to lose sight of.</p></div></div><div id="status" class="status-line">Loading…</div><div class="grid image-grid" id="favorites-grid"></div>{% endblock %}
+{% block scripts %}<script>
+async function loadFavorites(){const r=await apiFetch('/api/favorites'),d=await r.json(),grid=document.getElementById('favorites-grid'),status=document.getElementById('status');status.textContent=d.count?d.count+' favorite'+(d.count===1?'':'s'):'No favorites yet. Tap the heart on any photo.';d.favorites.forEach(item=>{item.favorite=true;grid.appendChild(makeThumbCard(mediaCardOptions(item,{onFavoriteChange:(active,card)=>{if(!active){card.remove();const left=grid.children.length;status.textContent=left?left+' favorite'+(left===1?'':'s'):'No favorites yet. Tap the heart on any photo.';}}})));});lazyLoadThumbs(grid);}loadFavorites();
+</script>{% endblock %}

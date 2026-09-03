@@ -1,0 +1,12 @@
+[Unit]
+Description=Generate semantic embeddings periodically
+
+[Timer]
+OnBootSec=12min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Persistent=true
+Unit=nfs-image-viewer-semantic-index.service
+
+[Install]
+WantedBy=timers.target

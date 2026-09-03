@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Lumina — Your library{% endblock %}
+{% block content %}
+<section class="hero">
+  <div><p class="eyebrow">Private photo library</p><h1>Good {{ 'morning' if now_hour < 12 else ('afternoon' if now_hour < 18 else 'evening') }}, {{ current_user.display_name }}</h1><p class="lede">{{ '{:,}'.format(total_media) }} memories, safely at home.</p></div>
+  <form action="{{ url_for('global_search_page') }}" class="hero-search"><span>⌕</span><input type="search" name="q" placeholder="Search people, places, moments…" aria-label="Search your library"><button type="submit">Search</button></form>
+</section>
+
+<section><div class="section-head"><div><p class="eyebrow">Browse</p><h2>Collections</h2></div><div class="quick-stats"><a href="{{ url_for('favorites_page') }}">♥ {{ favorite_count }}</a><a href="{{ url_for('albums_page') }}">▣ {{ album_count }} albums</a></div></div>
+  <div class="collection-grid">
+  {% for c in collections %}<a href="{{ url_for('browse', collection=c.name) }}" class="collection-card {% if not c.mounted %}unmounted{% endif %}"><div class="collection-art art-{{ loop.index }}"><span>{{ c.name[:1].upper() }}</span></div><div class="collection-copy"><strong>{{ c.name.replace('_', ' ').title() }}</strong><span>{{ '{:,}'.format(c.count) }} items{% if not c.mounted %} · Offline{% endif %}</span></div><span class="chevron">›</span></a>{% endfor %}
+  </div>
+</section>
+
+{% if recent %}<section class="recent-section"><div class="section-head"><div><p class="eyebrow">From your library</p><h2>Recent memories</h2></div></div><div class="grid image-grid" id="recent-grid"></div></section>{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+const RECENT={{ recent|tojson }};
+const recentGrid=document.getElementById('recent-grid');
+if(recentGrid){RECENT.forEach(item=>recentGrid.appendChild(makeThumbCard(mediaCardOptions(item))));lazyLoadThumbs(recentGrid);}
+</script>{% endblock %}

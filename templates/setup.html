@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Set up Lumina{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block main_class %}auth-shell{% endblock %}
+{% block content %}
+<section class="auth-card">
+  <div class="auth-art"><span class="brand-mark large"><span></span></span></div>
+  <p class="eyebrow">Welcome to Lumina</p><h1>Create your private gallery</h1>
+  <p class="lede">Set up the first administrator account. There is no public registration.</p>
+  <form method="post" class="form-stack">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <label>Display name<input name="display_name" autocomplete="name" required placeholder="Your name"></label>
+    <label>Username<input name="username" autocomplete="username" required minlength="3" maxlength="32" placeholder="e.g. yeeyang"></label>
+    <label>Password<input type="password" name="password" autocomplete="new-password" required minlength="8"></label>
+    <label>Confirm password<input type="password" name="password_confirm" autocomplete="new-password" required minlength="8"></label>
+    <button class="btn primary wide" type="submit">Create gallery</button>
+  </form>
+</section>
+{% endblock %}

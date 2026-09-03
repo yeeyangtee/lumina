@@ -1,0 +1,12 @@
+[Unit]
+Description=Generate video posters periodically
+
+[Timer]
+OnBootSec=8min
+OnUnitActiveSec=1h
+RandomizedDelaySec=3min
+Persistent=true
+Unit=nfs-image-viewer-posters.service
+
+[Install]
+WantedBy=timers.target

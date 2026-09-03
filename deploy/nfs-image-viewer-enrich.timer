@@ -1,0 +1,12 @@
+[Unit]
+Description=Enrich NFS Image Viewer metadata periodically
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+RandomizedDelaySec=2min
+Persistent=true
+Unit=nfs-image-viewer-enrich.service
+
+[Install]
+WantedBy=timers.target

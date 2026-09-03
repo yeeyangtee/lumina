@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>{% block title %}Lumina{% endblock %}</title>
+  <link rel="manifest" href="{{ url_for('manifest') }}">
+  <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='gallery.js') }}"></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <header class="topbar">
+    <a href="{{ url_for('index') }}" class="brand" aria-label="Lumina home">
+      <span class="brand-mark" aria-hidden="true"><span></span></span>
+      <span>Lumina</span>
+    </a>
+    {% if current_user %}
+    <nav class="desktop-nav" aria-label="Main navigation">
+      <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Library</a>
+      <a href="{{ url_for('global_search_page') }}" class="{% if 'search' in request.endpoint %}active{% endif %}">Search</a>
+      <a href="{{ url_for('favorites_page') }}" class="{% if request.endpoint == 'favorites_page' %}active{% endif %}">Favorites</a>
+      <a href="{{ url_for('albums_page') }}" class="{% if 'album' in request.endpoint %}active{% endif %}">Albums</a>
+    </nav>
+    <div class="account-menu">
+      {% if current_user.role == 'admin' %}<a href="{{ url_for('auth.admin') }}" class="icon-link" title="Admin">Admin</a>{% endif %}
+      <a href="{{ url_for('auth.account') }}" class="avatar" title="Account">{{ current_user.display_name[:1].upper() }}</a>
+    </div>
+    {% endif %}
+  </header>
+  {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="flash-stack" role="status">{% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+  <main class="page-shell {% block main_class %}{% endblock %}">{% block content %}{% endblock %}</main>
+  {% if current_user %}
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}"><span>⌂</span>Library</a>
+    <a href="{{ url_for('global_search_page') }}" class="{% if 'search' in request.endpoint %}active{% endif %}"><span>⌕</span>Search</a>
+    <a href="{{ url_for('favorites_page') }}" class="{% if request.endpoint == 'favorites_page' %}active{% endif %}"><span>♥</span>Favorites</a>
+    <a href="{{ url_for('albums_page') }}" class="{% if 'album' in request.endpoint %}active{% endif %}"><span>▣</span>Albums</a>
+  </nav>
+  {% endif %}
+  <script>if (window.isSecureContext && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

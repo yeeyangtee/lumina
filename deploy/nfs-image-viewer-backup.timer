@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up NFS Image Viewer daily
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+RandomizedDelaySec=10min
+Persistent=true
+Unit=nfs-image-viewer-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Admin — Lumina{% endblock %}
+{% block content %}
+<div class="page-title"><div><p class="eyebrow">Administration</p><h1>Gallery health</h1></div></div>
+<div class="job-actions">{% for job, label in [('scan','Scan files'),('metadata','Read metadata'),('posters','Build posters'),('semantic','Build visual index'),('backup','Back up now')] %}<form method="post" action="{{ url_for('auth.run_job', job=job) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="btn" type="submit">{{ label }}</button></form>{% endfor %}</div>
+<div class="stat-grid">
+  <div class="stat"><strong>{{ '{:,}'.format(stats.media) }}</strong><span>Media</span></div><div class="stat"><strong>{{ '{:,}'.format(stats.metadata_done) }}</strong><span>Metadata ready</span></div><div class="stat"><strong>{{ '{:,}'.format(stats.embeddings) }}</strong><span>Semantic ready</span></div><div class="stat"><strong>{{ '{:,}'.format(stats.posters) }}</strong><span>Video posters</span></div>
+</div>
+<div class="admin-grid">
+  <section class="panel"><div class="section-head"><h2>Accounts</h2></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
+    {% for user in users %}<tr><td><strong>{{ user.display_name }}</strong><small>@{{ user.username }}</small></td><td>{{ user.role }}</td><td><span class="status-pill {{ 'ready' if user.active else 'error' }}">{{ 'Active' if user.active else 'Disabled' }}</span></td><td>{% if user.id != current_user.id %}<form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="toggle_user"><input type="hidden" name="user_id" value="{{ user.id }}"><button class="text-btn" type="submit">{{ 'Disable' if user.active else 'Enable' }}</button></form>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div></section>
+  <section class="panel"><h2>Create account</h2><form method="post" class="form-stack">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="create_user">
+    <label>Display name<input name="display_name" required></label><label>Username<input name="username" minlength="3" maxlength="32" required></label><label>Temporary password<input type="password" name="password" minlength="8" required></label><label>Role<select name="role"><option value="user">User</option><option value="admin">Admin</option></select></label><button class="btn primary" type="submit">Create account</button>
+  </form></section>
+</div>
+<section class="panel scan-panel"><h2>Catalogue scans</h2><div class="scan-grid">{% for scan in scans %}<div><strong>{{ scan.collection.replace('_', ' ').title() }}</strong><span class="status-pill {{ scan.status }}">{{ scan.status }}</span><small>{{ '{:,}'.format(scan.files_seen) }} files</small></div>{% endfor %}</div></section>
+{% if jobs %}<section class="panel scan-panel"><h2>Background jobs</h2><div class="scan-grid">{% for job in jobs %}<div><strong>{{ job.job.title() }}</strong><span class="status-pill {{ job.status }}">{{ job.status }}</span><small>{{ '{:,}'.format(job.processed) }} / {{ '{:,}'.format(job.total) }}{% if job.error %} · {{ job.error }}{% endif %}</small></div>{% endfor %}</div></section>{% endif %}
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ filename }} — Lumina{% endblock %}
+{% block body_class %}viewer-page{% endblock %}
+{% block content %}
+<div class="viewer-bar" id="viewerBar">
+  <a href="{{ url_for('browse', collection=collection, subpath=parent_subpath) }}" class="btn" id="backBtn">← <span>Back</span></a>
+  <span class="viewer-counter">{{ idx }} / {{ total }}</span><span class="viewer-filename">{{ filename }}</span>
+  <button type="button" class="btn fav-btn {% if is_favorite %}is-fav{% endif %}" id="favBtn" aria-pressed="{{ 'true' if is_favorite else 'false' }}"><span class="fav-icon">{{ '♥' if is_favorite else '♡' }}</span> <span>Favorite</span></button>
+  <div class="album-popover"><button type="button" class="btn" id="albumBtn">＋ <span>Album</span></button><div class="album-menu" id="albumMenu" hidden>
+    {% if albums %}{% for album in albums %}<button type="button" data-album-id="{{ album.id }}" data-added="{{ 1 if album.contains else 0 }}"><span class="album-name">{{ album.name }}</span><span class="album-check">{{ '✓' if album.contains else '' }}</span></button>{% endfor %}{% else %}<a class="muted" href="{{ url_for('albums_page') }}">Create your first album</a>{% endif %}
+  </div></div>
+  {% if not is_video %}<button type="button" class="btn" id="infoBtn">ⓘ <span>Info</span></button>{% endif %}
+  <button type="button" class="btn" id="slideshowBtn">▶ <span>Play</span></button>
+  <a href="{{ url_for('serve_image', collection=collection, subpath=subpath) }}" class="btn" download="{{ filename }}">↓ <span>Save</span></a>
+</div>
+{% if not is_video %}<div id="infoPanel" class="info-panel" hidden></div>{% endif %}
+<div class="viewer-wrap" id="viewerWrap">
+  {% if prev_path %}<a href="{{ url_for('view', collection=collection, subpath=prev_path) }}" class="nav-btn prev" id="prevBtn" aria-label="Previous">‹</a>{% endif %}
+  {% if is_video %}<video src="{{ url_for('serve_image', collection=collection, subpath=subpath) }}" class="viewer-img" id="mainImg" controls autoplay playsinline></video>{% else %}<img src="{{ url_for('serve_image', collection=collection, subpath=subpath) }}" class="viewer-img" alt="{{ filename }}" id="mainImg">{% endif %}
+  {% if next_path %}<a href="{{ url_for('view', collection=collection, subpath=next_path) }}" class="nav-btn next" id="nextBtn" aria-label="Next">›</a>{% endif %}
+</div>
+{% endblock %}
+{% block scripts %}<script>
+const COLLECTION={{ collection|tojson }},SUBPATH={{ subpath|tojson }};
+const prevBtn=document.getElementById('prevBtn'),nextBtn=document.getElementById('nextBtn'),wrap=document.getElementById('viewerWrap'),media=document.getElementById('mainImg');
+document.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'&&prevBtn)prevBtn.click();else if(e.key==='ArrowRight'&&nextBtn)nextBtn.click();else if(e.key==='Escape')document.getElementById('backBtn').click();});
+
+if(media.tagName==='IMG'){
+  let scale=1,tx=0,ty=0,startScale=1,startDistance=0,startTx=0,startTy=0,swipe=null;const points=new Map(),MIN=1,MAX=6;
+  const apply=()=>{media.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;};
+  const reset=()=>{scale=1;tx=0;ty=0;apply();};
+  wrap.addEventListener('wheel',e=>{e.preventDefault();scale=Math.min(MAX,Math.max(MIN,scale*(e.deltaY<0?1.15:1/1.15)));if(scale===1)tx=ty=0;apply();},{passive:false});
+  media.addEventListener('dblclick',e=>{e.preventDefault();if(scale>1)reset();else{scale=2.5;apply();}});
+  wrap.addEventListener('pointerdown',e=>{points.set(e.pointerId,{x:e.clientX,y:e.clientY});wrap.setPointerCapture(e.pointerId);if(points.size===1){startTx=tx;startTy=ty;swipe={x:e.clientX,y:e.clientY,time:Date.now(),scale};}else if(points.size===2){swipe=null;const p=[...points.values()];startDistance=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);startScale=scale;}});
+  wrap.addEventListener('pointermove',e=>{if(!points.has(e.pointerId))return;const previous=points.get(e.pointerId);points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2){const p=[...points.values()];const distance=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);scale=Math.min(MAX,Math.max(MIN,startScale*distance/startDistance));apply();}else if(scale>1){tx+=e.clientX-previous.x;ty+=e.clientY-previous.y;apply();}});
+  const end=e=>{points.delete(e.pointerId);if(scale<1.04)reset();if(swipe&&swipe.scale===1&&Date.now()-swipe.time<700){const dx=e.clientX-swipe.x,dy=e.clientY-swipe.y;if(Math.abs(dx)>65&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0&&nextBtn)nextBtn.click();if(dx>0&&prevBtn)prevBtn.click();}}swipe=null;};
+  wrap.addEventListener('pointerup',end);wrap.addEventListener('pointercancel',end);
+}
+const favBtn=document.getElementById('favBtn');favBtn.addEventListener('click',async()=>{favBtn.disabled=true;try{const r=await apiFetch('/api/favorite/'+encodeURIComponent(COLLECTION)+'/'+encodeMediaPath(SUBPATH),{method:'POST'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not update favorite');favBtn.classList.toggle('is-fav',d.favorited);favBtn.setAttribute('aria-pressed',String(d.favorited));favBtn.querySelector('.fav-icon').textContent=d.favorited?'♥':'♡';showToast(d.favorited?'Added to favorites':'Removed from favorites');}catch(e){showToast(e.message,'error');}finally{favBtn.disabled=false;}});
+const albumBtn=document.getElementById('albumBtn'),albumMenu=document.getElementById('albumMenu');albumBtn.onclick=e=>{e.stopPropagation();albumMenu.hidden=!albumMenu.hidden;};document.addEventListener('click',()=>albumMenu.hidden=true);albumMenu.addEventListener('click',e=>e.stopPropagation());albumMenu.querySelectorAll('button[data-album-id]').forEach(button=>button.onclick=async()=>{const r=await apiFetch('/api/albums/'+button.dataset.albumId+'/toggle/'+encodeURIComponent(COLLECTION)+'/'+encodeMediaPath(SUBPATH),{method:'POST'}),d=await r.json();if(r.ok){button.dataset.added=d.added?'1':'0';button.querySelector('.album-check').textContent=d.added?'✓':'';showToast(d.added?'Added to album':'Removed from album');}});
+const slideBtn=document.getElementById('slideshowBtn');let timer;const slideOn=()=>sessionStorage.getItem('slideshow')==='1';function renderSlide(){slideBtn.innerHTML=slideOn()?'⏸ <span>Stop</span>':'▶ <span>Play</span>';}function arm(){if(slideOn()){if(nextBtn)timer=setTimeout(()=>nextBtn.click(),3500);else sessionStorage.removeItem('slideshow');}}slideBtn.onclick=()=>{if(slideOn()){sessionStorage.removeItem('slideshow');clearTimeout(timer);}else sessionStorage.setItem('slideshow','1');renderSlide();arm();};renderSlide();arm();
+const infoBtn=document.getElementById('infoBtn'),infoPanel=document.getElementById('infoPanel');if(infoBtn){let loaded=false;infoBtn.onclick=async()=>{infoPanel.hidden=!infoPanel.hidden;if(loaded||infoPanel.hidden)return;loaded=true;infoPanel.innerHTML='<span class="muted">Loading metadata…</span>';try{const r=await apiFetch('/api/exif/'+encodeURIComponent(COLLECTION)+'/'+encodeMediaPath(SUBPATH)),d=await r.json(),labels={camera:'Camera',lens:'Lens',taken:'Date taken',dimensions:'Dimensions',aperture:'Aperture',shutter:'Shutter',iso:'ISO',focal_length:'Focal length'},rows=[];for(const [key,label]of Object.entries(labels))if(d[key])rows.push('<dt>'+label+'</dt><dd>'+escapeHtml(d[key])+'</dd>');if(d.gps)rows.push('<dt>Location</dt><dd><a target="_blank" rel="noopener" href="'+encodeURI(d.gps.map)+'">'+d.gps.lat+', '+d.gps.lon+' ↗</a></dd>');infoPanel.innerHTML=rows.length?'<dl class="exif-list">'+rows.join('')+'</dl>':'<span class="muted">No metadata found.</span>';}catch{infoPanel.textContent='Could not read metadata.';}};}
+let hideTimer;function showControls(){document.body.classList.remove('controls-hidden');clearTimeout(hideTimer);hideTimer=setTimeout(()=>document.body.classList.add('controls-hidden'),3500);}wrap.addEventListener('pointerdown',showControls);document.getElementById('viewerBar').addEventListener('pointerdown',showControls);showControls();
+</script>{% endblock %}

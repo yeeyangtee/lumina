@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Sign in — Lumina{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block main_class %}auth-shell{% endblock %}
+{% block content %}
+<section class="auth-card compact">
+  <div class="auth-art"><span class="brand-mark large"><span></span></span></div>
+  <p class="eyebrow">Private library</p><h1>Welcome back</h1>
+  <form method="post" class="form-stack">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <label>Username<input name="username" autocomplete="username" autofocus required></label>
+    <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+    <label class="check-row"><input type="checkbox" name="remember" value="1"> Keep me signed in</label>
+    <button class="btn primary wide" type="submit">Sign in</button>
+  </form>
+</section>
+{% endblock %}

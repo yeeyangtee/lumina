@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{{ album.name }} — Lumina{% endblock %}
+{% block content %}<div class="page-title split"><div><p class="eyebrow">Album</p><h1>{{ album.name }}</h1>{% if album.description %}<p class="lede">{{ album.description }}</p>{% endif %}</div><button class="btn danger subtle" id="delete-album">Delete album</button></div><div id="status" class="status-line">Loading…</div><div class="grid image-grid" id="album-items"></div>{% endblock %}
+{% block scripts %}<script>
+const ALBUM_ID={{ album.id }};async function loadAlbum(){const r=await apiFetch('/api/albums/'+ALBUM_ID),d=await r.json(),grid=document.getElementById('album-items');document.getElementById('status').textContent=d.items.length?d.items.length+' item'+(d.items.length===1?'':'s'):'This album is empty.';d.items.forEach(item=>grid.appendChild(makeThumbCard(mediaCardOptions(item,{favoriteAction:null}))));lazyLoadThumbs(grid);}document.getElementById('delete-album').onclick=async()=>{if(!confirm('Delete this album? Your original files will not be changed.'))return;const r=await apiFetch('/api/albums/'+ALBUM_ID,{method:'DELETE'});if(r.ok)location.href='/albums';};loadAlbum();
+</script>{% endblock %}

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}{{ collection }} — Gallery{% endblock %}
+{% block content %}
+
+<nav class="breadcrumb">
+  <a href="{{ url_for('index') }}">Home</a>
+  <span>›</span>
+  <a href="{{ url_for('browse', collection=collection) }}">{{ collection.replace('_', ' ').title() }}</a>
+  {% for crumb in breadcrumbs %}
+  <span>›</span>
+  <a href="{{ url_for('browse', collection=collection, subpath=crumb.subpath) }}">{{ crumb.name }}</a>
+  {% endfor %}
+</nav>
+
+<div class="page-title">
+  <div><p class="eyebrow">Collection</p><h1>{{ breadcrumbs[-1].name if breadcrumbs else collection.replace('_', ' ').title() }}</h1><p class="lede">Browse folders, photos, and videos.</p></div>
+</div>
+
+<div class="toolbar">
+  <form id="search-form" class="search-box" autocomplete="off">
+    <input type="search" id="search-input" name="q" placeholder="Search this collection…">
+    <button type="submit" class="btn">Search</button>
+  </form>
+  <label class="sort-control">Sort:
+    <select id="sort-select">
+      <option value="name:asc">Name (A→Z)</option>
+      <option value="name:desc">Name (Z→A)</option>
+      <option value="mtime:desc">Newest first</option>
+      <option value="mtime:asc">Oldest first</option>
+    </select>
+  </label>
+</div>
+
+<div id="status" class="status-line">Loading…</div>
+<div id="folders-section"></div>
+<div id="images-section"></div>
+<div id="pagination"></div>
+
+<script>
+const COLLECTION = {{ collection | tojson }};
+const SUBPATH    = {{ subpath | tojson }};
+
+function thumbUrl(name) {
+  const p = SUBPATH ? SUBPATH + '/' + name : name;
+  return '/thumb/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(p);
+}
+function viewUrl(name) {
+  const p = SUBPATH ? SUBPATH + '/' + name : name;
+  return '/view/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(p);
+}
+function browseUrl(name, page) {
+  const p = SUBPATH ? SUBPATH + '/' + name : name;
+  let url = '/browse/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(p);
+  if (page && page > 1) url += '?page=' + page;
+  return url;
+}
+
+function currentSort() {
+  const params = new URLSearchParams(location.search);
+  return {
+    sort: params.get('sort') || 'name',
+    order: params.get('order') || 'asc',
+  };
+}
+
+async function loadPage(page) {
+  const params = new URLSearchParams(location.search);
+  page = page || parseInt(params.get('page')) || 1;
+  const { sort, order } = currentSort();
+
+  // Reflect current sort in the dropdown
+  const sel = document.getElementById('sort-select');
+  if (sel) sel.value = sort + ':' + order;
+
+  const apiPath = SUBPATH ? '/api/files/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(SUBPATH) : '/api/files/' + encodeURIComponent(COLLECTION) + '/';
+  const q = new URLSearchParams({ page, sort, order });
+  const res = await fetch(apiPath + '?' + q.toString());
+  const data = await res.json();
+
+  if (data.unmounted) {
+    document.getElementById('status').innerHTML =
+      '<div class="empty">📦 <strong>' + COLLECTION.replace(/_/g, ' ') +
+      '</strong> is not mounted. Connect the drive and reload.</div>';
+    return;
+  }
+
+  // Folders
+  const fSection = document.getElementById('folders-section');
+  if (data.folders.length) {
+    fSection.innerHTML = '<h2>Folders</h2><div class="grid folder-grid" id="folder-grid"></div>';
+    const grid = document.getElementById('folder-grid');
+    data.folders.forEach(name => {
+      const a = document.createElement('a');
+      a.href = browseUrl(name);
+      a.className = 'folder-card';
+      const sub = SUBPATH ? SUBPATH + '/' + name : name;
+      // Lazy-load the folder's first image as a cover; fall back to the emoji.
+      const img = document.createElement('img');
+      img.className = 'lazy-thumb folder-cover';
+      img.dataset.src = '/cover/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(sub);
+      img.src = '';
+      img.alt = name;
+      img.onerror = () => {
+        const ph = document.createElement('div');
+        ph.className = 'folder-placeholder';
+        ph.textContent = '🗂️';
+        img.replaceWith(ph);
+      };
+      a.appendChild(img);
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = name;
+      a.appendChild(label);
+      grid.appendChild(a);
+    });
+  }
+
+  // Images
+  const iSection = document.getElementById('images-section');
+  const status   = document.getElementById('status');
+  if (data.images.length) {
+    status.textContent = data.total_images + ' images' + (data.total_pages > 1 ? ', page ' + data.page + ' of ' + data.total_pages : '');
+    iSection.innerHTML = '<h2>Images <span class="count">(' + data.total_images + ' total)</span></h2><div class="grid image-grid" id="image-grid"></div>';
+    const grid = document.getElementById('image-grid');
+    const videoSet = new Set(data.videos || []);
+    const favSet = new Set(data.favorites || []);
+    data.images.forEach(name => {
+      const vid = videoSet.has(name);
+      grid.appendChild(makeThumbCard({
+        href: viewUrl(name),
+        title: name,
+        thumbSrc: vid ? '/poster/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(SUBPATH ? SUBPATH + '/' + name : name) : thumbUrl(name),
+        video: vid,
+        label: vid ? name : null,   // filename caption on video cards only
+        fav: favSet.has(name),
+        favoriteAction: '/api/favorite/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(SUBPATH ? SUBPATH + '/' + name : name),
+      }));
+    });
+  } else if (!data.folders.length) {
+    status.textContent = 'Empty folder';
+  } else {
+    status.textContent = '';
+  }
+
+  // Lazy-load covers (folders) and thumbs (images) together.
+  lazyLoadThumbs();
+
+  // Pagination
+  const pg = document.getElementById('pagination');
+  pg.innerHTML = '';
+  if (data.total_pages > 1) {
+    const pageHref = p => {
+      const u = new URLSearchParams({ page: p, sort, order });
+      return '?' + u.toString();
+    };
+    let html = '<div class="pagination">';
+    if (data.page > 1) html += '<a href="' + pageHref(data.page - 1) + '" class="btn">← Prev</a>';
+    html += '<span class="page-info">Page ' + data.page + ' / ' + data.total_pages + '</span>';
+    if (data.page < data.total_pages) html += '<a href="' + pageHref(data.page + 1) + '" class="btn">Next →</a>';
+    html += '</div>';
+    pg.innerHTML = html;
+  }
+}
+
+// Changing sort reloads page 1 with the new sort params in the URL.
+document.getElementById('sort-select').addEventListener('change', e => {
+  const [sort, order] = e.target.value.split(':');
+  const u = new URLSearchParams({ page: 1, sort, order });
+  location.search = '?' + u.toString();
+});
+
+wireSearchForm(COLLECTION);
+loadPage();
+</script>
+
+{% endblock %}

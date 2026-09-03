@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh NFS Image Viewer catalogue every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+RandomizedDelaySec=1min
+Persistent=true
+Unit=nfs-image-viewer-index.service
+
+[Install]
+WantedBy=timers.target
