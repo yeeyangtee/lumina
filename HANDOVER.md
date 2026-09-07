@@ -1,6 +1,6 @@
 # Lumina handover
 
-Last reviewed: **2026-09-03 21:32 SGT** on **yy-visionmini**.
+Last reviewed: **2026-09-07 SGT** on **yy-visionmini**.
 
 This is the session-start document for the next maintainer or AI agent. Read it
 with `AGENTS.md`, then consult `README.md` for operator instructions and
@@ -33,7 +33,7 @@ Current explicit decisions:
 
 Work from:
 
-    cd /home/yeeyang/projects/nfs-image-viewer
+    cd /home/yeeyang/projects/lumina
     git status --short
     git log -3 --oneline --decorate
     sed -n '1,240p' AGENTS.md
@@ -54,6 +54,7 @@ Never point tests at the production database.
 
 ## Live deployment state
 
+- Project source: `/home/yeeyang/projects/lumina`.
 - User-facing URL: `http://192.168.0.110:5050`
 - Web: Gunicorn, two threaded workers, user service
   `nfs-image-viewer.service`.

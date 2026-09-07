@@ -90,6 +90,9 @@ Status: ☐ todo · ◐ building/indexing · ☑ shipped · ⏸ intentionally on
 
 ## Changelog
 
+- **2026-09-07 — project rename:** moved the source folder to
+  `/home/yeeyang/projects/lumina`, updated all deployment paths, and preserved
+  the local Git history.
 - **2026-09-03 — maintenance handover:** reviewed code, documentation, live
   services, database integrity, tests, and remaining media exceptions; added
   `HANDOVER.md` and updated first-pass indexing status.

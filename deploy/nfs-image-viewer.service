@@ -5,11 +5,11 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/projects/nfs-image-viewer
+WorkingDirectory=%h/projects/lumina
 Environment=NFS_VIEWER_MEDIA_ROOT=/mnt/yeeyang
 Environment=NFS_VIEWER_LAN_ONLY=1
 EnvironmentFile=-%h/.config/nfs-image-viewer/env
-ExecStart=%h/projects/nfs-image-viewer/.venv/bin/python -m gunicorn --config gunicorn.conf.py wsgi:application
+ExecStart=%h/projects/lumina/.venv/bin/python -m gunicorn --config gunicorn.conf.py wsgi:application
 Restart=on-failure
 RestartSec=5
 UMask=0077

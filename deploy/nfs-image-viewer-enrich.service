@@ -5,10 +5,10 @@ After=network-online.target nfs-image-viewer-index.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/projects/nfs-image-viewer
+WorkingDirectory=%h/projects/lumina
 Environment=NFS_VIEWER_MEDIA_ROOT=/mnt/yeeyang
 EnvironmentFile=-%h/.config/nfs-image-viewer/env
-ExecStart=%h/projects/nfs-image-viewer/.venv/bin/python enrich.py --workers 4
+ExecStart=%h/projects/lumina/.venv/bin/python enrich.py --workers 4
 UMask=0077
 Nice=10
 IOSchedulingClass=idle

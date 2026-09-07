@@ -40,6 +40,7 @@ browsers.
 
 ## Architecture
 
+- Project source: `/home/yeeyang/projects/lumina`.
 - Flask/Gunicorn web app: port 5050.
 - SQLite catalogue: ~/.cache/nfs_image_viewer/library.db.
 - SMB share: //192.168.0.12/yeeyang at /mnt/yeeyang.

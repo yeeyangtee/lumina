@@ -3,9 +3,9 @@ Description=Back up NFS Image Viewer local database
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/projects/nfs-image-viewer
+WorkingDirectory=%h/projects/lumina
 EnvironmentFile=-%h/.config/nfs-image-viewer/env
-ExecStart=%h/projects/nfs-image-viewer/.venv/bin/python backup.py --keep 14
+ExecStart=%h/projects/lumina/.venv/bin/python backup.py --keep 14
 UMask=0077
 Nice=15
 NoNewPrivileges=true
