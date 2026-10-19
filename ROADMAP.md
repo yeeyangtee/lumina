@@ -91,7 +91,7 @@ Status: ☐ todo · ◐ building/indexing · ☑ shipped · ⏸ intentionally on
 - ☑ Isolated regressions and desktop/mobile browser checks across representative formats.
 - ☑ Full derived-data pass: 26,038 previews/search embeddings ready; 24 unreadable JPEGs explicitly reported, originals retained. All 1,621 video posters and 26,062 metadata rows ready.
 - ☑ Owner's MacBook usability review accepted on 2026-10-19.
-- ☐ Owner's phone usability review.
+- ☑ Owner's phone usability review accepted on 2026-10-19.
 - ⏸ New media-backup schedules, retention and off-site work explicitly deferred.
 
 The September Wave 1–4 counts above are historical milestones, not current
@@ -113,9 +113,16 @@ states. The existing verified SSD media copy is accepted for now.
   Reuse local 400px thumbnails and catalogue queries; no recursive NAS work in
   page requests. Current library covers use the first image by full relative
   path, or the first video's poster when no image exists.
-- ☐ Sharper thumbnails: require adequate embedded-preview resolution and prepare
-  better 400px thumbnails in the background. Existing quality remains unchanged;
-  benchmark a representative batch before a library-wide upgrade.
+- ☑ Sharper thumbnails: source-derived 400px JPEGs at quality 80, EXIF orientation,
+  separate 400-v2 cache, resumable four-worker library refresh and automatic
+  preparation of new photos by the existing preview timer. All 24,417 readable
+  photos refreshed; 24 known corrupt JPEGs remain excluded.
+- ☑ Separate 100-photo 400px quality/timing pilot: 41 photo-containing albums,
+  six formats, four low-priority workers, 100 ready/0 errors in 4.391 seconds,
+  2.37 MB output. OS/NAS caches not flushed; RAW/TIFF use local display copies.
+- ☑ Live review of four pilot thumbnails in Bali diving — GoPro and Vietnam —
+  Hanoi and Sapa; previous cache entries retained for rollback. Full-library
+  refresh is complete; owner accepted reviewed 400px quality.
 - ☐ Automatic rotation/orientation correction beyond existing EXIF handling;
   define desired behavior before implementation.
 - ☐ Automatic duplicate detection/deduplication and similar-photo grouping;
@@ -123,9 +130,29 @@ states. The existing verified SSD media copy is accepted for now.
 
 ## Changelog
 
+- **2026-10-19 — accepted quality checkpoint and pause:** owner accepted the
+  completed full-library thumbnails and requested a local Git checkpoint.
+  Handover records the deployed state, validation and remaining roadmap;
+  feature work is paused, with normal app services/timers left running.
+- **2026-10-19 — library thumbnail quality rollout:** implemented source-derived
+  400px JPEG generation with versioned local caching, safe publication and a
+  resumable low-priority refresh service. Existing caches are preserved; new
+  photos use the same quality automatically through the previews worker. All
+  24,417 eligible photos refreshed in 26m 46s, zero new errors, 537 MB output.
+  Versioned browser URLs are live; the 24 known unreadable JPEGs are unchanged.
+- **2026-10-19 — thumbnail quality accepted:** owner reviewed the live examples
+  and accepted 400px as good enough for the default. Four pilot replacements stay
+  live; the full-library quality refresh has not been started.
+- **2026-10-19 — live thumbnail review:** published four selected sharper 400px
+  thumbnails into the existing local cache for review in two Travel albums.
+  Original cache copies retained; source files, database and generation unchanged.
+- **2026-10-19 — phone acceptance and thumbnail pilot:** owner accepted phone
+  usability. Generated 100 source-derived 400px review thumbnails and comparison
+  sheets in a private local review directory, with measured timings. Live
+  thumbnail generation and cache remain unchanged pending quality review.
 - **2026-10-19 — accepted checkpoint:** owner approved the app on MacBook and
   requested a Git checkpoint of the organized-library integration and browsing
-  refinements. Phone acceptance remains pending. Four-image album cards added
+  refinements. Phone acceptance followed later that day. Four-image album cards added
   to future work, without changing current cover selection.
 - **2026-10-19 — thumbnail size:** standardized image thumbnails on 400px,
   removed responsive variant requests and normalized legacy size requests to

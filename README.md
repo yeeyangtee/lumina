@@ -33,10 +33,21 @@ stays available for original download; errors do not block the rest of the
 library. Covers and searches use the local catalogue. Folder browsing performs
 one NAS listing, never a recursive request-path traversal.
 
-Image thumbnails use one 400px bounding size for grids and image album covers.
-The hourly worker prepares new/changed photos; cache misses can also be generated
-on demand. Smaller embedded EXIF previews may still be used. The former 240/800px
-variants are no longer requested or generated; existing cache files are retained.
+Image thumbnails use one 400px bounding size for grids and image album covers,
+generated from the source at JPEG quality 80 with EXIF orientation correction.
+Tiny embedded EXIF thumbnails are bypassed; smaller originals retain native size.
+RAW/TIFF thumbnails use their existing local display copies. The hourly previews
+worker prepares new/changed photos; cache misses can also be generated on demand.
+The current quality cache is `~/.cache/nfs_image_viewer/thumbs/400-v2/`. Earlier
+cache files are retained for rollback. Versioned browser URLs avoid old blurry
+thumbnails remaining cached. The former 240/800px variants are not generated.
+
+An existing-library refresh is resumable through
+`nfs-image-viewer-thumbnails.service` or `refresh_thumbnails.py`. It skips completed
+current-version thumbnails and known preview failures, uses at most four workers,
+and records progress in Admin. Thumbnail errors are retained in the versioned
+cache's `errors.json`; retry only after inspection with
+`refresh_thumbnails.py --retry-errors`. No extra timer is needed for new photos.
 
 ## Configuration and operation
 
@@ -94,6 +105,7 @@ for a stopped-writer WAL-safe rollback; never overwrite a live database.
     .venv/bin/python -m py_compile app.py auth.py catalog.py config.py scanner.py \
       enrich.py previews.py library_metadata.py formats.py posters.py \
       semantic_index.py reuse_archive_cache.py integration_jobs.py job_lock.py
+    .venv/bin/python -m py_compile refresh_thumbnails.py
     node --check static/gallery.js
     node --check static/sw.js
 
@@ -105,5 +117,5 @@ preservation, RAW/TIFF previews, AVI range playback, audio and unknown dates.
 
 Read `HANDOVER.md` and `AGENTS.md` before maintenance. `ROADMAP.md` records shipped
 features and deferred scope. The browser pilot covers Chromium desktop/mobile;
-the owner accepted MacBook usability on 2026-10-19; phone gestures and any further
-browser-specific review remain pending.
+the owner accepted MacBook and phone usability on 2026-10-19. This does not imply
+acceptance testing on every browser.

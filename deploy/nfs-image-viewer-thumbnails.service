@@ -1,0 +1,17 @@
+[Unit]
+Description=Refresh versioned local Lumina image thumbnails
+After=network-online.target nfs-image-viewer-index.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/lumina
+Environment=NFS_VIEWER_MEDIA_ROOT=/mnt/yeeyang
+EnvironmentFile=-%h/.config/nfs-image-viewer/env
+ExecStart=%h/projects/lumina/.venv/bin/python refresh_thumbnails.py
+UMask=0077
+Nice=15
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+TimeoutStartSec=infinity

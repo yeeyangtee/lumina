@@ -26,6 +26,8 @@ deployment state, owner decisions, reviewed limitations, and next-step order.
 - scanner.py — staged media discovery; atomically updates only complete collections.
 - formats.py / library_metadata.py — shared format rules and validated NAS album cache.
 - previews.py / integration_jobs.py — bounded local display/playback preparation and resumable pipeline.
+- refresh_thumbnails.py — resumable, versioned 400px image-thumbnail refresh; new
+  photos use the existing previews worker automatically.
 - job_lock.py — per-role advisory locks shared by manual, timer and pipeline jobs.
 - reuse_archive_cache.py — explicit version-matched, media-only historical derivative reuse.
 - enrich.py — background EXIF/date/camera/dimensions/GPS enrichment.
@@ -84,7 +86,9 @@ or account passwords in this repository.
 - Scanner catalogue paths are trusted local database values, not request values.
 - Default browse performs one os.scandir pass. Mtime sort intentionally adds stat.
 - Never recursively walk the NAS inside a web request.
-- JPEG EXIF thumbnails are preferred; cache publication is atomic.
+- Image thumbnails use source-derived 400px JPEGs (quality 80), respecting EXIF
+  orientation. Bypass tiny embedded EXIF thumbnails. RAW/TIFF use local display
+  copies. Publish atomically under thumbs/400-v2; preserve historical cache files.
 - A missing mount is expected. Do not clear catalogue rows unless a complete scan
   with its unique marker succeeds.
 - Basic scans may read bounded album.json records, but must not open image/video bodies.
@@ -110,6 +114,8 @@ or account passwords in this repository.
 
 - nfs-image-viewer-index.timer — media scan every 15 minutes.
 - nfs-image-viewer-previews.timer — local image/playback preparation hourly.
+- nfs-image-viewer-thumbnails.service — on-demand resumable quality-cache refresh;
+  no extra timer, because previews prepares new/changed photos hourly.
 - nfs-image-viewer-enrich.timer — metadata enrichment every 30 minutes.
 - nfs-image-viewer-posters.timer — video posters hourly.
 - nfs-image-viewer-semantic-index.timer — visual embeddings hourly.

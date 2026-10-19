@@ -316,6 +316,57 @@ class ArchiveChecks(unittest.TestCase):
         }
         self.assertEqual(_read_metadata(row)[2:4], (None, None))
 
+    def test_thumbnail_refresh_resumes_and_requires_explicit_error_retry(self):
+        import refresh_thumbnails as worker
+
+        folder = app.BASE_DIRS['travel'] / 'thumbnail-worker'
+        album(folder)
+        for name in ('good.jpg', 'retry.jpg'):
+            Image.new('RGB', (900, 600), 'green').save(folder / name)
+        self.assertTrue(scanner.scan_collection('travel', app.BASE_DIRS['travel']))
+        with catalog.connect_db() as db:
+            db.execute("UPDATE media_items SET preview_status='ready' "
+                       "WHERE collection='travel' AND parent='thumbnail-worker'")
+        generate = worker.get_or_create_thumb
+
+        def fail_one(source):
+            return b'' if source.name == 'retry.jpg' else generate(source)
+
+        with patch.object(worker, 'get_or_create_thumb', side_effect=fail_one):
+            first = worker.refresh()
+        self.assertGreaterEqual(first['generated_this_run'], 1)
+        self.assertEqual(first['error_count'], 1)
+        ready_cache = app._thumb_cache_file(folder / 'good.jpg')
+        published_at = ready_cache.stat().st_mtime_ns
+        second = worker.refresh()
+        self.assertEqual(second['generated_this_run'], 0)
+        self.assertEqual(second['held_errors'], 1)
+        self.assertEqual(second['errors_this_run'], 0)
+        retried = worker.refresh(retry_errors=True)
+        self.assertEqual(retried['generated_this_run'], 1)
+        self.assertEqual(retried['error_count'], 0)
+        self.assertEqual(retried['ready'], retried['eligible_images'])
+        self.assertEqual(ready_cache.stat().st_mtime_ns, published_at)
+
+    def test_thumbnail_preview_worker_prepares_new_photos_automatically(self):
+        import piexif
+
+        source = self.folder / 'new-photo.jpg'
+        embedded = io.BytesIO()
+        Image.new('RGB', (160, 120), 'red').save(embedded, format='JPEG')
+        exif = piexif.dump({'thumbnail': embedded.getvalue(), '1st': {}})
+        Image.new('RGB', (1200, 900), 'green').save(source, exif=exif)
+        self.assertTrue(scanner.scan_collection('travel', app.BASE_DIRS['travel']))
+        result = subprocess.run([sys.executable, 'previews.py'], cwd=Path(app.__file__).parent,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with catalog.connect_db() as db:
+            status = db.execute("SELECT preview_status FROM media_items "
+                                "WHERE collection='travel' AND subpath='journey/new-photo.jpg'").fetchone()[0]
+        self.assertEqual(status, 'ready')
+        with Image.open(app._thumb_cache_file(source)) as image:
+            self.assertEqual(image.size, (400, 300))
+
     def test_audio_is_separate_and_catalogued(self):
         import wave
 

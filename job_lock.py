@@ -7,6 +7,7 @@ from catalog import DATA_DIR
 def single_job(name):
     if name not in {
         'previews',
+        'thumbnails',
         'metadata',
         'posters',
         'semantic',

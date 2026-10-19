@@ -45,7 +45,7 @@ const ALBUM_ROOTS = new Set({{ source_albums | map(attribute='root') | list | to
 
 function thumbUrl(name) {
   const p = SUBPATH ? SUBPATH + '/' + name : name;
-  return '/thumb/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(p);
+  return versionThumbnailUrl('/thumb/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(p));
 }
 function viewUrl(name) {
   const p = SUBPATH ? SUBPATH + '/' + name : name;
@@ -105,7 +105,7 @@ async function loadPage(page) {
       // Lazy-load the folder's first image as a cover; fall back to the emoji.
       const img = document.createElement('img');
       img.className = 'lazy-thumb folder-cover';
-      img.dataset.src = '/cover/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(sub);
+      img.dataset.src = versionThumbnailUrl('/cover/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(sub));
       img.loading = 'lazy';
       img.decoding = 'async';
       img.alt = name;

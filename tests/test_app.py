@@ -1,4 +1,5 @@
 import os
+import io
 import json
 import re
 import shutil
@@ -8,6 +9,7 @@ from contextlib import contextmanager
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -173,6 +175,48 @@ class GallerySmokeTest(unittest.TestCase):
         self.assertEqual(AnchorParser(markup).anchors['backBtn'], origin)
         self.assertIn('&amp;year=2026', markup)
         self.assertNotIn('<script>alert(1)</script>', markup)
+
+    def test_thumbnail_uses_source_resolution_and_preserves_legacy_cache(self):
+        import piexif
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            source = Path(directory) / 'oriented.jpg'
+            embedded = io.BytesIO()
+            Image.new('RGB', (160, 120), 'red').save(embedded, format='JPEG')
+            exif = piexif.dump({'0th': {piexif.ImageIFD.Orientation: 6},
+                                'thumbnail': embedded.getvalue(), '1st': {}})
+            Image.new('RGB', (1200, 900), 'green').save(source, exif=exif)
+            cache = application._thumb_cache_file(source)
+            legacy = application.THUMB_CACHE.parent / cache.name
+            legacy.write_bytes(embedded.getvalue())
+            try:
+                data = application.get_or_create_thumb(source)
+                with Image.open(io.BytesIO(data)) as image:
+                    self.assertEqual(image.size, (300, 400))
+                self.assertEqual(legacy.read_bytes(), embedded.getvalue())
+                self.assertEqual(application.get_or_create_thumb(source, 800), data)
+                self.assertEqual(application.get_or_create_thumb(source, 240), data)
+                self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
+                with Image.open(source) as original:
+                    self.assertEqual(original.size, (1200, 900))
+            finally:
+                legacy.unlink(missing_ok=True)
+                cache.unlink(missing_ok=True)
+
+    def test_thumbnail_does_not_publish_if_source_changes_during_decode(self):
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            source = Path(directory) / 'changing.png'
+            Image.new('RGB', (1200, 900), 'green').save(source)
+            cache = application._thumb_cache_file(source)
+            encode = application._to_jpeg_bytes
+
+            def replace_source(image, quality=80):
+                result = encode(image, quality)
+                Image.new('RGB', (1201, 901), 'blue').save(source)
+                return result
+
+            with patch.object(application, '_to_jpeg_bytes', side_effect=replace_source):
+                self.assertEqual(application.get_or_create_thumb(source), b'')
+            self.assertFalse(cache.exists())
 
     def test_pages_and_search(self):
         for path in (

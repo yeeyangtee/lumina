@@ -59,9 +59,12 @@ VIDEO_MIMETYPES = {
     '.webm': 'video/webm',
 }
 THUMB_SIZE = (400, 400)
-THUMB_ALLOWED_SIZES = (400,)
+THUMB_VERSION = '400-v2'
 # Persistent cache so thumbnails survive reboots.
-THUMB_CACHE = DATA_DIR / 'thumbs'
+_thumb_root = DATA_DIR / 'thumbs'
+_thumb_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+_thumb_root.chmod(0o700)
+THUMB_CACHE = _thumb_root / THUMB_VERSION
 THUMB_CACHE.mkdir(parents=True, exist_ok=True, mode=0o700)
 THUMB_CACHE.chmod(0o700)
 PAGE_SIZE = 100
@@ -105,6 +108,11 @@ def require_lan_client():
 init_auth(app)
 
 
+@app.context_processor
+def thumbnail_context():
+    return {'thumbnail_version': THUMB_VERSION}
+
+
 @app.after_request
 def security_headers(response):
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
@@ -143,25 +151,6 @@ def _to_jpeg_bytes(img: Image.Image, quality=80) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=quality)
     return buf.getvalue()
-
-
-def _exif_thumbnail(img_path: Path, thumb_size=THUMB_SIZE) -> bytes | None:
-    """Extract an embedded EXIF thumbnail without decoding the full image."""
-    try:
-        exif = piexif.load(str(img_path))
-        raw = exif.get('thumbnail')
-        if raw and len(raw) > 500:
-            # Decode, correct orientation, resize up to THUMB_SIZE
-            img = Image.open(io.BytesIO(raw))
-            orientation = exif.get('0th', {}).get(piexif.ImageIFD.Orientation, 1)
-            if not img.getexif().get(274):
-                img.getexif()[274] = orientation
-            img = fix_orientation(img).convert('RGB')
-            img.thumbnail(thumb_size, Image.LANCZOS)
-            return _to_jpeg_bytes(img, quality=75)
-    except Exception:
-        pass
-    return None
 
 
 def _ratio(val) -> float | None:
@@ -276,46 +265,43 @@ def get_exif_info(img_path: Path) -> dict:
     return info
 
 
-def _thumb_cache_file(img_path: Path, size=400) -> Path:
-    # Key includes size+mtime so a replaced file gets a fresh thumbnail
-    # instead of serving the stale cached one forever.
-    try:
+def _thumb_cache_file(img_path: Path, size=400, *, source_version=None) -> Path:
+    # One size; the versioned directory keeps historical derivatives intact.
+    if source_version is None:
         st = img_path.stat()
-        sig = f'{img_path}:{st.st_size}:{st.st_mtime_ns}:{size}'
-    except OSError:
-        sig = str(img_path)
+        source_version = (st.st_size, st.st_mtime_ns)
+    sig = f'{img_path}:{source_version[0]}:{source_version[1]}:400'
     key = hashlib.md5(sig.encode()).hexdigest()
     return THUMB_CACHE / f'{key}.jpg'
 
 
 def get_or_create_thumb(img_path: Path, size=400) -> bytes:
-    size = min(THUMB_ALLOWED_SIZES, key=lambda allowed: abs(allowed - int(size)))
-    thumb_size = (size, size)
-    cache_file = _thumb_cache_file(img_path, size)
-    if cache_file.exists():
-        return cache_file.read_bytes()
-
-    # Fast path: EXIF embedded thumbnail (reads only JPEG header, ~50KB)
-    if img_path.suffix.lower() in JPEG_EXTS:
-        data = _exif_thumbnail(img_path, thumb_size)
-        if data:
-            _write_cache_file(cache_file, data)
-            return data
-
-    # Slow path: decode full image with draft mode
+    """Source-derived 400px JPEG, matching the owner's accepted quality pilot."""
     try:
+        before = img_path.stat()
+        version = (before.st_size, before.st_mtime_ns)
+        cache_file = _thumb_cache_file(img_path, source_version=version)
+        if cache_file.is_file():
+            return cache_file.read_bytes()
+        source = img_path
         if img_path.suffix.lower() in DERIVED_IMAGES:
-            cached = image_path(img_path)
-            if not cached.is_file():
+            source = image_path(img_path)
+            if not source.is_file():
                 return b''
-            img = Image.open(cached)
-        else:
-            img = Image.open(img_path)
-        if img_path.suffix.lower() in JPEG_EXTS:
-            img.draft('RGB', thumb_size)
-        img = fix_orientation(img).convert('RGB')
-        img.thumbnail(thumb_size, Image.LANCZOS)
-        data = _to_jpeg_bytes(img)
+        # Tiny embedded EXIF thumbnails are deliberately bypassed. RAW/TIFF
+        # use background-prepared display JPEGs; never convert them here.
+        with Image.open(source) as original:
+            if source.suffix.lower() in JPEG_EXTS:
+                original.draft('RGB', THUMB_SIZE)
+            img = fix_orientation(original).convert('RGB')
+            try:
+                img.thumbnail(THUMB_SIZE, Image.LANCZOS)
+                data = _to_jpeg_bytes(img, quality=80)
+            finally:
+                img.close()
+        after = img_path.stat()
+        if version != (after.st_size, after.st_mtime_ns):
+            raise OSError('Source changed during thumbnail preparation')
         _write_cache_file(cache_file, data)
         return data
     except Exception:

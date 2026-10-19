@@ -4,6 +4,73 @@ Current maintenance checkpoint: **2026-10-19, Asia/Singapore**. Read this with
 `AGENTS.md`. The owner approved implementation, deployment, full indexing, and
 code/documentation review before their final browser review.
 
+## Paused at owner-requested checkpoint — 2026-10-19
+
+The owner accepted the completed full-library 400px rollout ("looks good") and
+requested a checkpoint before pausing work. The local Git commit titled
+`checkpoint: accepted full-library 400px thumbnails` captures the quality
+generator, resumable refresh service, versioned browser URLs, regression tests,
+phone acceptance and pilot/rollout documentation following `02b71cc`.
+No remote push or new deployment is part of this checkpoint.
+
+The prior 20 isolated tests and desktop/mobile browser checks passed; checkpoint
+review found no whitespace errors. Both live health endpoints were rechecked:
+web/database and all four collection roots were healthy; semantic search was
+healthy with 26,038 ready embeddings. There is no manual processing job to
+resume. Normal app services and scheduled maintenance remain enabled.
+
+Pause feature work until the owner returns. Remaining choices are four-photo
+album covers, rotation beyond EXIF, duplicate/similar-photo review, and the
+navigation limitations documented below. No next feature has been started.
+This is a source checkpoint; existing local app/database backup policy is
+unchanged, and private cache/review evidence remains outside Git.
+
+## Completed full-library 400px quality rollout — 2026-10-19
+
+The owner explicitly requested implementation for the whole library after
+accepting the four live examples. The new generator produces source-derived
+JPEGs up to 400px, quality 80, with EXIF orientation correction, bypassing tiny
+embedded thumbnails. Smaller originals are not upscaled. RAW/TIFF use their
+existing local display copies. Output is in `~/.cache/nfs_image_viewer/thumbs/400-v2/`;
+historical thumbnails and pilot rollback copies remain intact.
+
+`refresh_thumbnails.py` and `nfs-image-viewer-thumbnails.service` provide a
+resumable low-priority pass over ready image rows, with at most four workers,
+source-version checks, per-version error records and Admin job progress.
+Completed versioned files are skipped. Known preview failures are excluded;
+errors from this worker require explicit `--retry-errors` after inspection.
+No schema or media-row updates are made by the refresh (only normal job_state
+progress updates). New/changed photos automatically use the same generator in
+the existing hourly previews worker; no new timer was added. Embeddings and
+video posters are unchanged.
+
+The refresh finished successfully: all 24,417 eligible photos are ready, zero
+new errors, in 1,606.188 seconds (26m 46s). The cache totals 537,013,760 bytes.
+All files were checked as readable JPEGs with a 400px longest edge and private
+permissions; all 100 approved pilot files match byte-for-byte. The known 24 JPEG
+decoding failures remain excluded, with originals downloadable. Existing
+embeddings remain 26,038 ready and all 1,621 video previews/posters are unchanged.
+
+The live web service was switched after verification. Image and album-cover
+URLs now include `v=400-v2`; updated static-shell versions avoid stale browser
+thumbnails. Both service health endpoints returned ok. No source files, media
+rows, accounts/session keys or private lists were migrated. The existing previews
+unit now has no overall startup timeout so large new-photo batches can finish.
+The refresh used four low-priority workers; systemd recorded 8.6G peak memory and
+zero swap for the one-off pass. Existing app timers remain in place.
+
+Rollout and verification evidence are under
+`~/.cache/nfs_image_viewer/reviews/20261019-quality400-rollout/`, including
+`source-before/`, `staged-app/`, `frontend.patch`, `full-refresh-report.json`,
+`verification.json`, and `browser-result.json`. The frontend patch is already
+applied; do not reapply it or copy the staged application over production.
+
+Nine smoke/regression tests cover resolution, source races and legacy-cache
+preservation. Eleven isolated integration tests include resumability, held
+errors/explicit retries and automatic processing of new photos. This work
+follows checkpoint `02b71cc`; the subsequent owner-requested quality checkpoint
+also includes the documentation recording phone acceptance and the earlier pilot.
+
 ## Accepted Git checkpoint — 2026-10-19
 
 The owner reports that the app looks good on their MacBook and explicitly
@@ -14,8 +81,8 @@ thumbnail decision, isolated tests and maintenance documentation. It is a source
 checkpoint, not a fresh database backup or a remote push. The existing private
 deployment journal and SQLite backups retain their separate roles.
 
-Phone acceptance remains pending; do not infer a Safari-specific sign-off from
-the MacBook report. Future album-cover task: explore four-image/2×2 album cards,
+The owner subsequently accepted phone usability too; do not infer a browser-specific
+sign-off from either device report. Future album-cover task: explore four-image/2×2 album cards,
 selection of representative photos and fallback for small albums, using local
 400px thumbnails and catalogue queries. No collage implementation is included.
 Current library/folder covers choose the first image by full relative path across
@@ -48,16 +115,16 @@ checks of covers, 100-item pages, viewer-next-return, native browser Back and sc
 Browser fixtures and screenshots are under `/tmp/lumina-ui-review-browser`; no
 production accounts or state were used. Browser runtime libraries were extracted
 privately there, with no system package installation. The owner accepted MacBook
-usability; phone and any further browser-specific review remain pending.
+and phone usability; no claim is made about testing every browser.
 
 After discussing responsive variants, the owner chose to use only 400px image
 thumbnails. Workers prepare that size and cache misses can be generated on demand.
 The frontend no longer supplies 240/800px srcset candidates; legacy size requests
 normalize to 400px. Existing cache files are retained, with no cache wipe/rebuild.
-Video poster sizing is unchanged. Embedded JPEG EXIF thumbnails are still accepted
-without ensuring sufficient resolution. A future quality upgrade should version
-only thumbnail derivatives and prepare better 400px images in the background,
-with a representative benchmark first. No quality rebuild is authorized/running.
+Video poster sizing is unchanged. At this early refinement stage, embedded JPEG
+EXIF thumbnails were still accepted regardless of resolution. The subsequent
+pilot and completed full-library rollout above supersede that behavior: current
+image thumbnails use source-derived 400px quality in the separate 400-v2 cache.
 
 Future requests recorded in ROADMAP.md: automatic rotation beyond existing EXIF
 orientation support, automatic duplicate handling and similar-photo grouping.
@@ -78,12 +145,66 @@ isolated image check confirmed 240/400/800 requests all reuse one 400px cache en
 Python/JavaScript syntax and all-template compilation passed. Both live health
 endpoints remained ok, with semantic readiness still 26,038.
 
+## Separate 400px quality pilot — 2026-10-19
+
+At the owner's request, a separate 100-photo review batch lives at
+`~/.cache/nfs_image_viewer/reviews/20261019-185255-thumbnails400/`.
+Open `index.html`, `sheets/examples-8.jpg`, `sheets/all-100.jpg` and
+`sheets/comparison-4.jpg`; `review-bundle.zip` packages all images, reports and
+reproducible scripts. Private file permissions apply. No new web route or public
+hosting was added; review photos and their filename mapping remain local.
+
+The deterministic sample covers all 41 source albums with ready photos (the
+other three albums are video-only), plus a loose Uncategorized photo: 70 JPEGs,
+13 HEIC, 9 CR2, 5 TIFF and 3 PNG. Four low-priority threads generated all 100
+fresh source-derived 400px JPEGs at quality 80 in 4.391 seconds, zero errors,
+2,371,497 output bytes. Median per-file time was 0.148 seconds, p95 0.398 seconds;
+batch throughput was 22.772 photos/second. Timings cover source-version checks,
+decode/resize/encode and local atomic publication, excluding selection, sheets
+and reports. Eighty-six inputs were NAS originals; fourteen RAW/TIFF inputs were
+existing local display copies. OS/NAS caches were not flushed, so this is not a
+guaranteed cold-cache benchmark or a full-library completion estimate.
+
+Existing 400px-cache images were copied for comparison after timing finished;
+42/100 have a longest dimension below 400px. New images all have a 400px longest
+dimension, keeping aspect ratio. Comparisons show the same square card crop on
+both sides. The pilot deliberately bypasses small embedded EXIF thumbnails;
+live generation still accepts them. Production thumbnails, database, originals
+and services were not modified during this separate pilot. The owner subsequently
+accepted the live examples below and requested the now-completed library rollout.
+
+### Live four-thumbnail review — 2026-10-19
+
+The owner then explicitly requested selected pilot thumbnails in the live app.
+Four version-matched local 400px cache entries were atomically replaced:
+
+- Travel / `2024-08_gopro_bali` (Bali diving — GoPro): `GOPR0998.JPG` and
+  `GOPR1000.JPG`, cards 7 and 9 on page 1 with default filename ascending sort.
+- Travel / `2022-07_vietnam_gopro` (Vietnam — Hanoi and Sapa): `GOPR0102.JPG`
+  and `GOPR0108.JPG`, cards 2 and 3 on page 1 with the same sort.
+
+These are pilot samples 75, 7, 70 and 2. Other thumbnails and generation behavior
+are unchanged. The old 160×120 thumbnails and publication manifest are preserved
+in the review directory under `live-pilot-20261019-190120/before/` and
+`live-pilot-20261019-190120/manifest.json`. Publication verified catalogue/source
+size and nanosecond mtime, JPEG dimensions and exact published byte hashes. No
+database writes, original changes, new routes or service restart were required.
+
+Thumbnail responses remain browser-cached for a day; ask the owner to hard-refresh
+the album once if old thumbnails persist. New query parameters on direct /thumb
+URLs can also bypass an existing browser cache. The pilot has not changed full
+image viewing or visual-search embeddings. The owner subsequently reviewed these
+examples and confirmed that 400px is good enough as the default. The sharper pilot
+is the accepted quality target. This four-file legacy-cache trial has now been
+superseded by the completed 400-v2 library refresh described above. Its old cache
+copies and publication manifest remain useful rollback evidence.
+
 ## Handoff to the next AI agent
 
 The owner has handed Lumina to a separate agent and returned this conversation
 to the broader data-management work. Integration through step 3 is deployed and
 finished; there is no unfinished full-library processing queue to resume.
-The owner accepted MacBook usability on 2026-10-19; phone review remains pending.
+The owner accepted MacBook and phone usability on 2026-10-19.
 
 Start by reading this file, `AGENTS.md`, `README.md` and `ROADMAP.md`, then inspect
 the current Git diff and recheck the two `/healthz` endpoints. The latest live
@@ -100,10 +221,10 @@ expanded documentation; do not copy the older worktree over production.
 
 Suggested next steps, in order:
 
-1. Help with remaining phone review and concrete feedback. MacBook usability is
-   accepted; isolated Chromium desktop/mobile checks passed.
-2. Use ROADMAP.md for requested future work: four-image album covers, better
-   400px thumbnail quality, auto-rotation and duplicate/similar-photo handling.
+1. Help with concrete feedback. MacBook, phone and 400px quality are accepted;
+   isolated Chromium desktop/mobile checks passed and the quality rollout is done.
+2. Use ROADMAP.md for requested future work: four-image album covers,
+   auto-rotation and duplicate/similar-photo handling.
    These are recorded tasks, not currently running jobs.
 3. Preserve the accepted checkpoint and review subsequent changes separately;
    do not silently include unrelated changes in later commits.
@@ -269,7 +390,7 @@ Final full-pass checkpoint: 26,038 previews and visual-search embeddings ready;
 a worker is still running. Metadata is ready for all 26,062 visual items and
 posters for all 1,621 videos. All 985 CR2 and five TIFF previews are ready.
 Regular app timers are restored; the existing daily SQLite backup policy is
-unchanged. Owner MacBook usability is accepted; phone acceptance remains pending.
+unchanged. Owner MacBook and phone usability are accepted.
 
 ## Verification and rollback
 
@@ -294,7 +415,7 @@ older snapshots; the integration used a dedicated verified online copy instead.
 
 ## Scope still deferred
 
-The owner's phone usability review remains pending after MacBook acceptance.
+The owner has accepted both MacBook and phone usability.
 Named-face recognition, OCR, perceptual duplicate browsing, local HTTPS, UFW and
 cache garbage collection remain separate decisions. LAN-only access, existing
 accounts/authentication and the original media are preserved. New media-backup

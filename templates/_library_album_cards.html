@@ -1,7 +1,7 @@
 <div class="album-grid library-album-grid">
 {% for album in source_albums %}
   <a class="album-card library-album-card" href="{{ url_for('browse', collection=album.collection, subpath=album.root) }}">
-    <div class="album-cover"><img loading="lazy" decoding="async" src="{{ url_for('folder_cover', collection=album.collection, subpath=album.root) }}" alt=""></div>
+    <div class="album-cover"><img loading="lazy" decoding="async" src="{{ url_for('folder_cover', collection=album.collection, subpath=album.root, v=thumbnail_version) }}" alt=""></div>
     <div class="album-copy">
       <strong>{{ album.title }}</strong>
       <span>{{ album.date_value or 'Date unknown' }} · {{ '{:,}'.format(album.media_count) }} items</span>

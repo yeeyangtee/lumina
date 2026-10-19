@@ -13,3 +13,4 @@ IOSchedulingClass=idle
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
+TimeoutStartSec=infinity

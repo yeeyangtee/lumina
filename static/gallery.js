@@ -1,3 +1,14 @@
+const THUMB_VERSION = document.querySelector('meta[name="thumbnail-version"]')?.content || '400-v2';
+
+function versionThumbnailUrl(value) {
+  const url = new URL(value, location.href);
+  if (url.origin === location.origin && /^\/(thumb|cover)\//.test(url.pathname)) {
+    url.searchParams.set('v', THUMB_VERSION);
+    return url.pathname + url.search + url.hash;
+  }
+  return value;
+}
+
 const VIDEO_EXTS = ['.mp4', '.mov', '.m4v', '.webm', '.avi'];
 
 function isVideo(name) {
@@ -63,7 +74,7 @@ function makeThumbCard(opts) {
 
   const img = document.createElement('img');
   img.className = 'lazy-thumb';
-  img.dataset.src = opts.thumbSrc;
+  img.dataset.src = versionThumbnailUrl(opts.thumbSrc);
   img.alt = opts.title || '';
   img.loading = 'lazy';
   img.decoding = 'async';
