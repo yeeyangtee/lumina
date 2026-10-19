@@ -23,7 +23,11 @@ deployment state, owner decisions, reviewed limitations, and next-step order.
 - auth.py — setup/login/session/CSRF/account/admin and fixed job triggers.
 - config.py — environment-driven collection paths.
 - catalog.py — schema version, SQLite connections, queries, scan/job state.
-- scanner.py — incremental media discovery; never deletes after a partial scan.
+- scanner.py — staged media discovery; atomically updates only complete collections.
+- formats.py / library_metadata.py — shared format rules and validated NAS album cache.
+- previews.py / integration_jobs.py — bounded local display/playback preparation and resumable pipeline.
+- job_lock.py — per-role advisory locks shared by manual, timer and pipeline jobs.
+- reuse_archive_cache.py — explicit version-matched, media-only historical derivative reuse.
 - enrich.py — background EXIF/date/camera/dimensions/GPS enrichment.
 - media_cache.py / posters.py — derived video poster paths and ffmpeg worker.
 - semantic_model.py — singleton OpenCLIP MobileCLIP-S1 model helpers.
@@ -83,8 +87,12 @@ or account passwords in this repository.
 - JPEG EXIF thumbnails are preferred; cache publication is atomic.
 - A missing mount is expected. Do not clear catalogue rows unless a complete scan
   with its unique marker succeeds.
-- Do not open originals during the basic scan. Metadata, posters, and ML belong in
-  their low-priority background services.
+- Basic scans may read bounded album.json records, but must not open image/video bodies.
+  Metadata, previews, posters and ML belong in low-priority background services.
+- Keep shared source-album UUIDs separate from private user-created album IDs.
+- Do not infer capture dates from copy/scan mtimes; unknown_year is intentional.
+- Scanner pruning must retain data on invalid/partial/empty or missing-album scans.
+  The explicit --allow-prune option is only for reviewed source changes.
 - VIDEO_EXTS also exists in static/gallery.js; keep both lists synchronized.
 
 ## SQLite and migration invariants
@@ -101,6 +109,7 @@ or account passwords in this repository.
 ## Background services
 
 - nfs-image-viewer-index.timer — media scan every 15 minutes.
+- nfs-image-viewer-previews.timer — local image/playback preparation hourly.
 - nfs-image-viewer-enrich.timer — metadata enrichment every 30 minutes.
 - nfs-image-viewer-posters.timer — video posters hourly.
 - nfs-image-viewer-semantic-index.timer — visual embeddings hourly.
@@ -113,12 +122,21 @@ an explicit `--retry-errors` CLI run. A later no-op run may set `job_state` to
 `ready 0/0`, so use status-column counts for true coverage. Use Nice and idle I/O
 class for NAS/CPU-heavy jobs so browsing stays responsive.
 
+## Current owner backup boundary
+
+The existing verified SSD Restic media copy is accepted for now. Do not introduce
+new media-backup schedules, retention or off-site work; the owner explicitly deferred
+those. SSD detachment is only after the wider data-management task. Existing daily
+app SQLite backups remain unchanged. Preserve accounts/session state; no wholesale
+cache/data-directory wipe. See HANDOVER.md for the current 44-album checkpoint.
+
 ## Test and verify
 
     .venv/bin/python -m unittest discover -s tests -v
     .venv/bin/python -m py_compile app.py auth.py backup.py catalog.py config.py \
       enrich.py media_cache.py posters.py scanner.py semantic_index.py \
       semantic_model.py semantic_server.py
+    .venv/bin/python tests/integration_checks.py -v
     node --check static/gallery.js
     node --check static/sw.js
     curl http://127.0.0.1:5050/healthz

@@ -13,7 +13,7 @@
 </nav>
 
 <div class="page-title">
-  <div><p class="eyebrow">Collection</p><h1>{{ breadcrumbs[-1].name if breadcrumbs else collection.replace('_', ' ').title() }}</h1><p class="lede">Browse folders, photos, and videos.</p></div>
+  <div><h1>{{ breadcrumbs[-1].name if breadcrumbs else collection.replace('_', ' ').title() }}</h1>{% if folder_note or source_album %}<p class="lede">{{ folder_note or source_album.description or '' }}</p>{% endif %}{% if source_album and subpath == source_album.root and source_album.date_value %}<p class="muted">{{ source_album.date_value }}</p>{% endif %}</div>
 </div>
 
 <div class="toolbar">
@@ -32,13 +32,16 @@
 </div>
 
 <div id="status" class="status-line">Loading…</div>
+{% if source_albums %}<section aria-label="Library albums">{% include '_library_album_cards.html' %}</section>{% endif %}
 <div id="folders-section"></div>
+<div id="pagination-top"></div>
 <div id="images-section"></div>
 <div id="pagination"></div>
 
 <script>
 const COLLECTION = {{ collection | tojson }};
 const SUBPATH    = {{ subpath | tojson }};
+const ALBUM_ROOTS = new Set({{ source_albums | map(attribute='root') | list | tojson }});
 
 function thumbUrl(name) {
   const p = SUBPATH ? SUBPATH + '/' + name : name;
@@ -74,7 +77,7 @@ async function loadPage(page) {
 
   const apiPath = SUBPATH ? '/api/files/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(SUBPATH) : '/api/files/' + encodeURIComponent(COLLECTION) + '/';
   const q = new URLSearchParams({ page, sort, order });
-  const res = await fetch(apiPath + '?' + q.toString());
+  const res = await apiFetch(apiPath + '?' + q.toString());
   const data = await res.json();
 
   if (data.unmounted) {
@@ -83,13 +86,18 @@ async function loadPage(page) {
       '</strong> is not mounted. Connect the drive and reload.</div>';
     return;
   }
+  if (!res.ok) throw new Error('Could not load this folder. Please reload to try again.');
+  // Keep clamped page numbers in the address so the viewer can return exactly here.
+  params.set('page', data.page);
+  history.replaceState(null, '', '?' + params.toString());
 
   // Folders
   const fSection = document.getElementById('folders-section');
-  if (data.folders.length) {
+  const folders = data.folders.filter(name => SUBPATH || !ALBUM_ROOTS.has(name));
+  if (folders.length) {
     fSection.innerHTML = '<h2>Folders</h2><div class="grid folder-grid" id="folder-grid"></div>';
     const grid = document.getElementById('folder-grid');
-    data.folders.forEach(name => {
+    folders.forEach(name => {
       const a = document.createElement('a');
       a.href = browseUrl(name);
       a.className = 'folder-card';
@@ -98,7 +106,8 @@ async function loadPage(page) {
       const img = document.createElement('img');
       img.className = 'lazy-thumb folder-cover';
       img.dataset.src = '/cover/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(sub);
-      img.src = '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
       img.alt = name;
       img.onerror = () => {
         const ph = document.createElement('div');
@@ -109,7 +118,8 @@ async function loadPage(page) {
       a.appendChild(img);
       const label = document.createElement('div');
       label.className = 'label';
-      label.textContent = name;
+      label.textContent = data.folder_details?.[name]?.title || name;
+      if(data.folder_details?.[name]?.description){const note=document.createElement('small');note.textContent=data.folder_details[name].description;label.appendChild(note);}
       a.appendChild(label);
       grid.appendChild(a);
     });
@@ -119,8 +129,10 @@ async function loadPage(page) {
   const iSection = document.getElementById('images-section');
   const status   = document.getElementById('status');
   if (data.images.length) {
-    status.textContent = data.total_images + ' images' + (data.total_pages > 1 ? ', page ' + data.page + ' of ' + data.total_pages : '');
-    iSection.innerHTML = '<h2>Images <span class="count">(' + data.total_images + ' total)</span></h2><div class="grid image-grid" id="image-grid"></div>';
+    const first = (data.page - 1) * data.page_size + 1;
+    const last = first + data.images.length - 1;
+    status.textContent = first + '–' + last + ' of ' + data.total_images + ' photos and videos';
+    iSection.innerHTML = '<h2>Photos and videos</h2><div class="grid image-grid" id="image-grid"></div>';
     const grid = document.getElementById('image-grid');
     const videoSet = new Set(data.videos || []);
     const favSet = new Set(data.favorites || []);
@@ -136,11 +148,13 @@ async function loadPage(page) {
         favoriteAction: '/api/favorite/' + encodeURIComponent(COLLECTION) + '/' + encodeMediaPath(SUBPATH ? SUBPATH + '/' + name : name),
       }));
     });
-  } else if (!data.folders.length) {
+  } else if (!data.folders.length && !ALBUM_ROOTS.size) {
     status.textContent = 'Empty folder';
   } else {
     status.textContent = '';
   }
+
+  if(data.audio?.length){const box=document.createElement('section');box.innerHTML='<h2>Audio recordings</h2>';data.audio.forEach(item=>{const p=document.createElement('p');p.textContent=item.name;const audio=document.createElement('audio');audio.controls=true;audio.preload='none';audio.src='/audio/'+encodeURIComponent(COLLECTION)+'/'+encodeMediaPath(item.subpath);p.appendChild(audio);const download=document.createElement('a');download.href=audio.src+'?download=1';download.textContent='Download recording';p.appendChild(download);box.appendChild(p)});iSection.appendChild(box);status.textContent=data.audio.length+' audio recordings';}
 
   // Lazy-load covers (folders) and thumbs (images) together.
   lazyLoadThumbs();
@@ -153,13 +167,22 @@ async function loadPage(page) {
       const u = new URLSearchParams({ page: p, sort, order });
       return '?' + u.toString();
     };
-    let html = '<div class="pagination">';
+    let html = '<nav class="pagination" aria-label="Photo pages">';
     if (data.page > 1) html += '<a href="' + pageHref(data.page - 1) + '" class="btn">← Prev</a>';
-    html += '<span class="page-info">Page ' + data.page + ' / ' + data.total_pages + '</span>';
+    const pages = new Set([1, data.total_pages]);
+    for (let p = Math.max(1, data.page - 1); p <= Math.min(data.total_pages, data.page + 1); p++) pages.add(p);
+    let previous = 0;
+    [...pages].sort((a, b) => a - b).forEach(p => {
+      if (previous && p - previous > 1) html += '<span class="page-info" aria-hidden="true">…</span>';
+      html += '<a href="' + pageHref(p) + '" class="btn" aria-label="Page ' + p + '"' + (p === data.page ? ' aria-current="page"' : '') + '>' + p + '</a>';
+      previous = p;
+    });
     if (data.page < data.total_pages) html += '<a href="' + pageHref(data.page + 1) + '" class="btn">Next →</a>';
-    html += '</div>';
+    html += '</nav>';
     pg.innerHTML = html;
   }
+  document.getElementById('pagination-top').innerHTML = pg.innerHTML;
+  restoreGalleryScroll();
 }
 
 // Changing sort reloads page 1 with the new sort params in the URL.
@@ -170,7 +193,7 @@ document.getElementById('sort-select').addEventListener('change', e => {
 });
 
 wireSearchForm(COLLECTION);
-loadPage();
+loadPage().catch(error => { document.getElementById('status').textContent = error.message; });
 </script>
 
 {% endblock %}

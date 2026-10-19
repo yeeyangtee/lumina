@@ -18,7 +18,7 @@ DATA_DIR = Path(
 ).expanduser()
 DB_PATH = DATA_DIR / 'library.db'
 LEGACY_FAVORITES_DB = DATA_DIR / 'favorites.db'
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def connect_db() -> sqlite3.Connection:
@@ -37,7 +37,7 @@ def init_db() -> None:
     with connect_db() as conn:
         conn.execute('PRAGMA journal_mode = WAL')
         conn.executescript(
-            '''
+            """
             CREATE TABLE IF NOT EXISTS media_items (
                 id INTEGER PRIMARY KEY,
                 collection TEXT NOT NULL,
@@ -142,22 +142,32 @@ def init_db() -> None:
                 total INTEGER NOT NULL DEFAULT 0,
                 error TEXT
             );
-            '''
+            """
         )
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS source_albums (
+                album_id TEXT PRIMARY KEY,collection TEXT NOT NULL,root TEXT NOT NULL,
+                title TEXT NOT NULL,description TEXT,date_value TEXT,body TEXT NOT NULL,
+                media_count INTEGER NOT NULL DEFAULT 0,UNIQUE(collection,root));
+            CREATE TABLE IF NOT EXISTS audio_items (
+                collection TEXT NOT NULL,subpath TEXT NOT NULL,parent TEXT NOT NULL,
+                name TEXT NOT NULL,size INTEGER NOT NULL,mtime_ns INTEGER NOT NULL,
+                PRIMARY KEY(collection,subpath));
+        """)
         _add_media_columns(conn)
         conn.executescript(
-            '''CREATE INDEX IF NOT EXISTS media_captured_year
+            """CREATE INDEX IF NOT EXISTS media_captured_year
                    ON media_items (captured_year);
                CREATE INDEX IF NOT EXISTS media_metadata_status
                    ON media_items (metadata_status);
                CREATE INDEX IF NOT EXISTS media_embedding_status
                    ON media_items (embedding_status, embedding_model);
                CREATE INDEX IF NOT EXISTS media_poster_status
-                   ON media_items (media_type, poster_status);'''
+                   ON media_items (media_type, poster_status);"""
         )
         conn.execute(
             "INSERT INTO schema_info(key, value) VALUES ('version', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
             (str(SCHEMA_VERSION),),
         )
     _migrate_legacy_favorites()
@@ -168,6 +178,8 @@ def _add_media_columns(conn: sqlite3.Connection) -> None:
     existing = {row['name'] for row in conn.execute('PRAGMA table_info(media_items)')}
     columns = {
         'captured_at': 'TEXT',
+        'preview_status': "TEXT NOT NULL DEFAULT 'pending'",
+        'preview_error': 'TEXT',
         'captured_year': 'INTEGER',
         'camera': 'TEXT',
         'lens': 'TEXT',
@@ -204,7 +216,8 @@ def _migrate_legacy_favorites() -> None:
     with connect_db() as conn:
         conn.executemany(
             'INSERT OR IGNORE INTO favorites (collection, subpath, created) '
-            'VALUES (?, ?, ?)', rows
+            'VALUES (?, ?, ?)',
+            rows,
         )
 
 
@@ -214,22 +227,28 @@ def search_media(collection: str, query: str, limit: int) -> tuple[list[str], bo
     pattern = f'%{escaped}%'
     with connect_db() as conn:
         rows = conn.execute(
-            '''SELECT subpath
+            """SELECT subpath
                FROM media_items
                WHERE collection = ?
                  AND (name LIKE ? ESCAPE '\\' COLLATE NOCASE
                       OR parent LIKE ? ESCAPE '\\' COLLATE NOCASE)
                ORDER BY subpath COLLATE NOCASE
-               LIMIT ?''',
+               LIMIT ?""",
             (collection, pattern, pattern, limit + 1),
         ).fetchall()
     return [row['subpath'] for row in rows[:limit]], len(rows) > limit
 
 
-def search_catalog(query: str = '', collection: str | None = None,
-                   year: int | None = None, media_type: str | None = None,
-                   camera: str | None = None, favorite_user_id: int | None = None,
-                   limit: int = 200, offset: int = 0) -> tuple[list[dict], int]:
+def search_catalog(
+    query: str = '',
+    collection: str | None = None,
+    year: int | None = None,
+    media_type: str | None = None,
+    camera: str | None = None,
+    favorite_user_id: int | None = None,
+    limit: int = 200,
+    offset: int = 0,
+) -> tuple[list[dict], int]:
     """Search indexed paths and metadata, returning lightweight media records."""
     where: list[str] = []
     params: list[object] = []
@@ -244,9 +263,12 @@ def search_catalog(query: str = '', collection: str | None = None,
             "(m.name LIKE ? ESCAPE '\\' COLLATE NOCASE "
             "OR m.parent LIKE ? ESCAPE '\\' COLLATE NOCASE "
             "OR m.camera LIKE ? ESCAPE '\\' COLLATE NOCASE "
-            "OR m.lens LIKE ? ESCAPE '\\' COLLATE NOCASE)"
+            "OR m.lens LIKE ? ESCAPE '\\' COLLATE NOCASE "
+            'OR EXISTS(SELECT 1 FROM source_albums sa WHERE sa.collection=m.collection '
+            "AND substr(m.subpath,1,length(sa.root)+1)=sa.root||'/' "
+            "AND (sa.title LIKE ? ESCAPE '\\' COLLATE NOCASE OR sa.description LIKE ? ESCAPE '\\' COLLATE NOCASE)))"
         )
-        params.extend((pattern, pattern, pattern, pattern))
+        params.extend((pattern, pattern, pattern, pattern, pattern, pattern))
     if year:
         where.append('m.captured_year = ?')
         params.append(year)
@@ -265,11 +287,11 @@ def search_catalog(query: str = '', collection: str | None = None,
             f'SELECT COUNT(*) FROM media_items m{joins}{predicate}', params
         ).fetchone()[0]
         rows = conn.execute(
-            f'''SELECT m.id, m.collection, m.subpath, m.name, m.media_type,
+            f"""SELECT m.id, m.collection, m.subpath, m.name, m.media_type,
                        m.captured_at, m.captured_year, m.camera, m.width, m.height
                 FROM media_items m{joins}{predicate}
                 ORDER BY COALESCE(m.captured_at, '') DESC, m.subpath COLLATE NOCASE
-                LIMIT ? OFFSET ?''',
+                LIMIT ? OFFSET ?""",
             params + [limit, offset],
         ).fetchall()
     return [dict(row) for row in rows], total
@@ -288,7 +310,8 @@ def scan_status(collection: str) -> dict | None:
     with connect_db() as conn:
         row = conn.execute(
             'SELECT status, started_at, completed_at, files_seen, error '
-            'FROM scan_state WHERE collection = ?', (collection,)
+            'FROM scan_state WHERE collection = ?',
+            (collection,),
         ).fetchone()
     return dict(row) if row else None
 
@@ -297,38 +320,40 @@ def mark_scan_started(collection: str) -> None:
     now = time.time()
     with connect_db() as conn:
         conn.execute(
-            '''INSERT INTO scan_state
+            """INSERT INTO scan_state
                    (collection, status, started_at, completed_at, files_seen, error)
                VALUES (?, 'running', ?, NULL, 0, NULL)
                ON CONFLICT(collection) DO UPDATE SET
                    status = 'running', started_at = excluded.started_at,
-                   files_seen = 0, error = NULL''',
+                   files_seen = 0, error = NULL""",
             (collection, now),
         )
 
 
-def mark_scan_finished(collection: str, status: str, files_seen: int,
-                       error: str | None = None) -> None:
+def mark_scan_finished(
+    collection: str, status: str, files_seen: int, error: str | None = None
+) -> None:
     with connect_db() as conn:
         conn.execute(
-            '''INSERT INTO scan_state
+            """INSERT INTO scan_state
                    (collection, status, started_at, completed_at, files_seen, error)
                VALUES (?, ?, NULL, ?, ?, ?)
                ON CONFLICT(collection) DO UPDATE SET
                    status = excluded.status,
                    completed_at = excluded.completed_at,
                    files_seen = excluded.files_seen,
-                   error = excluded.error''',
+                   error = excluded.error""",
             (collection, status, time.time(), files_seen, error),
         )
 
 
-def update_job(job: str, status: str, processed: int = 0, total: int = 0,
-               error: str | None = None) -> None:
+def update_job(
+    job: str, status: str, processed: int = 0, total: int = 0, error: str | None = None
+) -> None:
     now = time.time()
     with connect_db() as conn:
         conn.execute(
-            '''INSERT INTO job_state
+            """INSERT INTO job_state
                    (job, status, started_at, completed_at, processed, total, error)
                VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(job) DO UPDATE SET
@@ -339,8 +364,14 @@ def update_job(job: str, status: str, processed: int = 0, total: int = 0,
                                        THEN excluded.completed_at ELSE NULL END,
                    processed = excluded.processed,
                    total = excluded.total,
-                   error = excluded.error''',
-            (job, status, now if status == 'running' else None,
-             now if status in ('ready', 'error') else None,
-             processed, total, error),
+                   error = excluded.error""",
+            (
+                job,
+                status,
+                now if status == 'running' else None,
+                now if status in ('ready', 'error') else None,
+                processed,
+                total,
+                error,
+            ),
         )

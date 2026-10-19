@@ -1,0 +1,9 @@
+[Unit]
+Description=Prepare newly indexed Lumina display/playback previews
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=5min
+Persistent=true
+Unit=nfs-image-viewer-previews.service
+[Install]
+WantedBy=timers.target

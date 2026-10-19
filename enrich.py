@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from job_lock import single_job
+
 import argparse
-import time
+import re
+import subprocess
+import imageio_ffmpeg
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path
 
 from PIL import Image
 
@@ -13,16 +18,21 @@ from app import BASE_DIRS, get_exif_info
 from catalog import connect_db, init_db, update_job
 
 
-def _captured(value: str | None, mtime_ns: int) -> tuple[str, int]:
+def _captured(value: str | None, mtime_ns: int):
+    # Copy/scan mtimes do not establish when a photograph was taken.
     if value:
         for pattern in ('%Y:%m:%d %H:%M:%S', '%Y-%m-%d %H:%M:%S'):
             try:
-                parsed = datetime.strptime(value, pattern)
-                return parsed.strftime('%Y-%m-%d %H:%M:%S'), parsed.year
+                dt = datetime.strptime(value, pattern)
+                return dt.strftime('%Y-%m-%d %H:%M:%S'), dt.year
             except ValueError:
                 pass
-    parsed = datetime.fromtimestamp(mtime_ns / 1_000_000_000)
-    return parsed.strftime('%Y-%m-%d %H:%M:%S'), parsed.year
+        try:
+            dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            return dt.strftime('%Y-%m-%d %H:%M:%S'), dt.year
+        except ValueError:
+            pass
+    return None, None
 
 
 def _read_metadata(row: dict) -> tuple:
@@ -35,24 +45,62 @@ def _read_metadata(row: dict) -> tuple:
             width, height = image.size
             if not info.get('taken'):
                 try:
-                    raw_taken = image.getexif().get(36867)
+                    exif = image.getexif()
+                    raw_taken = exif.get_ifd(34665).get(36867) or exif.get(36867)
                     if raw_taken:
                         info['taken'] = str(raw_taken)
                 except Exception:
                     pass
+    else:
+        ff = imageio_ffmpeg.get_ffmpeg_exe()
+        probe = subprocess.run(
+            [ff, '-nostdin', '-hide_banner', '-i', str(path)],
+            capture_output=True,
+            text=True,
+            timeout=45,
+        )
+        date = re.search(r'creation_time\s*:\s*([^\n]+)', probe.stderr)
+        if date:
+            info['taken'] = date[1].strip()
     captured_at, captured_year = _captured(info.get('taken'), row['mtime_ns'])
+    parts = Path(row['subpath']).parts
+    if (
+        row['collection'] == 'family_photos'
+        and len(parts) > 1
+        and parts[0] == 'childhood'
+    ):
+        if parts[1] == 'unknown_year':
+            captured_at = captured_year = None
+        elif re.fullmatch(r'(19|20)\d{2}', parts[1]):
+            year = int(parts[1])
+            if captured_year != year:
+                captured_at = None
+            captured_year = year
+
     gps = info.get('gps') or {}
     return (
-        row['id'], row['mtime_ns'], captured_at, captured_year,
-        info.get('camera'), info.get('lens'), width, height,
-        gps.get('lat'), gps.get('lon'),
+        row['id'],
+        row['mtime_ns'],
+        captured_at,
+        captured_year,
+        info.get('camera'),
+        info.get('lens'),
+        width,
+        height,
+        gps.get('lat'),
+        gps.get('lon'),
     )
 
 
+@single_job('metadata')
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--limit', type=int, default=0,
-                        help='maximum rows this run; 0 processes all pending rows')
+    parser.add_argument(
+        '--limit',
+        type=int,
+        default=0,
+        help='maximum rows this run; 0 processes all pending rows',
+    )
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--retry-errors', action='store_true')
     args = parser.parse_args()
@@ -80,11 +128,11 @@ def main() -> int:
                     result = future.result()
                     with connect_db() as db:
                         db.execute(
-                            '''UPDATE media_items SET
+                            """UPDATE media_items SET
                                    captured_at = ?, captured_year = ?, camera = ?, lens = ?,
                                    width = ?, height = ?, latitude = ?, longitude = ?,
                                    metadata_status = 'ready', metadata_error = NULL
-                               WHERE id = ? AND mtime_ns = ?''',
+                               WHERE id = ? AND mtime_ns = ?""",
                             result[2:] + result[:2],
                         )
                 except Exception as exc:
@@ -92,14 +140,20 @@ def main() -> int:
                     with connect_db() as db:
                         db.execute(
                             "UPDATE media_items SET metadata_status = 'error', metadata_error = ? "
-                            'WHERE id = ?', (f'{type(exc).__name__}: {exc}'[:500], row['id'])
+                            'WHERE id = ?',
+                            (f'{type(exc).__name__}: {exc}'[:500], row['id']),
                         )
                 processed += 1
                 if processed % 100 == 0:
                     update_job('metadata', 'running', processed, total)
                     print(f'metadata: {processed}/{len(rows)}', flush=True)
-        update_job('metadata', 'ready', processed, total,
-                   f'{errors} unreadable files' if errors else None)
+        update_job(
+            'metadata',
+            'ready',
+            processed,
+            total,
+            f'{errors} unreadable files' if errors else None,
+        )
         print(f'metadata: processed {processed}, errors {errors}')
         return 0
     except Exception as exc:

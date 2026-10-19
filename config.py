@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 
-COLLECTION_NAMES = ('media_others', 'media_travel', 'our_wedding')
+COLLECTION_NAMES = ('travel', 'events', 'family_photos', 'uncategorized')
 
 
 def load_base_dirs() -> dict[str, Path]:
@@ -23,6 +23,8 @@ def load_base_dirs() -> dict[str, Path]:
             raise ValueError('NFS_VIEWER_COLLECTIONS_JSON must be a non-empty object')
         return {str(name): Path(path).expanduser() for name, path in values.items()}
 
-    default_root = '/Volumes/yeeyang' if os.uname().sysname == 'Darwin' else '/mnt/yeeyang'
+    default_root = (
+        '/Volumes/yeeyang' if os.uname().sysname == 'Darwin' else '/mnt/yeeyang'
+    )
     root = Path(os.environ.get('NFS_VIEWER_MEDIA_ROOT', default_root)).expanduser()
-    return {name: root / name for name in COLLECTION_NAMES}
+    return {name: root / 'media' / name for name in COLLECTION_NAMES}

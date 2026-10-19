@@ -13,7 +13,6 @@ import time
 from collections import defaultdict, deque
 from datetime import timedelta
 from functools import wraps
-from pathlib import Path
 from urllib.parse import urlsplit
 
 from flask import (
@@ -67,7 +66,8 @@ def _user_by_id(user_id: int):
     with connect_db() as db:
         return db.execute(
             'SELECT id, username, display_name, role, active, created_at, last_login_at '
-            'FROM users WHERE id = ?', (user_id,)
+            'FROM users WHERE id = ?',
+            (user_id,),
         ).fetchone()
 
 
@@ -111,27 +111,34 @@ def admin_required(fn):
         if not g.user or g.user['role'] != 'admin':
             abort(403)
         return fn(*args, **kwargs)
+
     return wrapper
 
 
-def _create_user(username: str, display_name: str, password: str,
-                 role: str = 'user') -> int:
+def _create_user(
+    username: str, display_name: str, password: str, role: str = 'user'
+) -> int:
     if not USERNAME_RE.fullmatch(username):
-        raise ValueError('Username must be 3–32 letters, numbers, dots, dashes, or underscores.')
-    if len(password) < PASSWORD_MIN_LENGTH:
         raise ValueError(
-            f'Password must be at least {PASSWORD_MIN_LENGTH} characters.'
+            'Username must be 3–32 letters, numbers, dots, dashes, or underscores.'
         )
+    if len(password) < PASSWORD_MIN_LENGTH:
+        raise ValueError(f'Password must be at least {PASSWORD_MIN_LENGTH} characters.')
     display_name = display_name.strip() or username
     if len(display_name) > 80:
         raise ValueError('Display name must be 80 characters or fewer.')
     with connect_db() as db:
         cursor = db.execute(
-            '''INSERT INTO users
+            """INSERT INTO users
                    (username, display_name, password_hash, role, active, created_at)
-               VALUES (?, ?, ?, ?, 1, ?)''',
-            (username, display_name, generate_password_hash(password, method='scrypt'),
-             role, time.time()),
+               VALUES (?, ?, ?, ?, 1, ?)""",
+            (
+                username,
+                display_name,
+                generate_password_hash(password, method='scrypt'),
+                role,
+                time.time(),
+            ),
         )
         return cursor.lastrowid
 
@@ -139,11 +146,11 @@ def _create_user(username: str, display_name: str, password: str,
 def _migrate_global_favorites(user_id: int) -> None:
     with connect_db() as db:
         db.execute(
-            '''INSERT OR IGNORE INTO user_favorites (user_id, media_id, created_at)
+            """INSERT OR IGNORE INTO user_favorites (user_id, media_id, created_at)
                SELECT ?, m.id, f.created
                FROM favorites f
                JOIN media_items m
-                 ON m.collection = f.collection AND m.subpath = f.subpath''',
+                 ON m.collection = f.collection AND m.subpath = f.subpath""",
             (user_id,),
         )
 
@@ -171,8 +178,12 @@ def init_auth(app) -> None:
                 session.clear()
 
         public = {
-            'auth.login', 'auth.setup', 'health', 'static',
-            'manifest', 'service_worker',
+            'auth.login',
+            'auth.setup',
+            'health',
+            'static',
+            'manifest',
+            'service_worker',
         }
         if request.endpoint in public or request.method == 'OPTIONS':
             return None
@@ -189,7 +200,9 @@ def init_auth(app) -> None:
         if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
             return None
         expected = session.get('_csrf_token', '')
-        supplied = request.headers.get('X-CSRF-Token') or request.form.get('_csrf_token', '')
+        supplied = request.headers.get('X-CSRF-Token') or request.form.get(
+            '_csrf_token', ''
+        )
         if not expected or not hmac.compare_digest(expected, supplied):
             if request.path.startswith('/api/'):
                 return jsonify({'error': 'invalid CSRF token'}), 400
@@ -248,8 +261,13 @@ def login():
             user = db.execute(
                 'SELECT * FROM users WHERE username = ? COLLATE NOCASE', (username,)
             ).fetchone()
-        if not user or not user['active'] or not check_password_hash(
-                user['password_hash'], request.form.get('password', '')):
+        if (
+            not user
+            or not user['active']
+            or not check_password_hash(
+                user['password_hash'], request.form.get('password', '')
+            )
+        ):
             _record_failed_login(client)
             flash('Incorrect username or password.', 'error')
         else:
@@ -259,8 +277,10 @@ def login():
             session.permanent = request.form.get('remember') == '1'
             csrf_token()
             with connect_db() as db:
-                db.execute('UPDATE users SET last_login_at = ? WHERE id = ?',
-                           (time.time(), user['id']))
+                db.execute(
+                    'UPDATE users SET last_login_at = ? WHERE id = ?',
+                    (time.time(), user['id']),
+                )
             next_url = request.args.get('next')
             return redirect(next_url if _is_safe_next(next_url) else url_for('index'))
     return render_template('login.html')
@@ -278,8 +298,9 @@ def account():
         current_password = request.form.get('current_password', '')
         new_password = request.form.get('new_password', '')
         with connect_db() as db:
-            full_user = db.execute('SELECT * FROM users WHERE id = ?',
-                                   (g.user['id'],)).fetchone()
+            full_user = db.execute(
+                'SELECT * FROM users WHERE id = ?', (g.user['id'],)
+            ).fetchone()
             if not check_password_hash(full_user['password_hash'], current_password):
                 flash('Current password is incorrect.', 'error')
             elif len(new_password) < PASSWORD_MIN_LENGTH:
@@ -290,9 +311,13 @@ def account():
             elif new_password != request.form.get('new_password_confirm', ''):
                 flash('The new passwords do not match.', 'error')
             else:
-                db.execute('UPDATE users SET password_hash = ? WHERE id = ?',
-                           (generate_password_hash(new_password, method='scrypt'),
-                            g.user['id']))
+                db.execute(
+                    'UPDATE users SET password_hash = ? WHERE id = ?',
+                    (
+                        generate_password_hash(new_password, method='scrypt'),
+                        g.user['id'],
+                    ),
+                )
                 flash('Password updated.', 'success')
                 return redirect(url_for('auth.account'))
     return render_template('account.html')
@@ -322,8 +347,9 @@ def admin():
                 flash('You cannot deactivate your own account.', 'error')
             else:
                 with connect_db() as db:
-                    db.execute('UPDATE users SET active = 1 - active WHERE id = ?',
-                               (user_id,))
+                    db.execute(
+                        'UPDATE users SET active = 1 - active WHERE id = ?', (user_id,)
+                    )
                 flash('Account status updated.', 'success')
         return redirect(url_for('auth.admin'))
 
@@ -332,11 +358,27 @@ def admin():
             'SELECT id, username, display_name, role, active, created_at, last_login_at '
             'FROM users ORDER BY created_at'
         ).fetchall()
-        scans = db.execute(
-            'SELECT * FROM scan_state ORDER BY collection'
-        ).fetchall()
+        scans = db.execute('SELECT * FROM scan_state ORDER BY collection').fetchall()
         stats = {
             'media': db.execute('SELECT COUNT(*) FROM media_items').fetchone()[0],
+            'preview_done': db.execute(
+                "SELECT COUNT(*) FROM media_items WHERE preview_status='ready'"
+            ).fetchone()[0],
+            'preview_pending': db.execute(
+                "SELECT COUNT(*) FROM media_items WHERE preview_status='pending'"
+            ).fetchone()[0],
+            'preview_errors': db.execute(
+                "SELECT COUNT(*) FROM media_items WHERE preview_status='error'"
+            ).fetchone()[0],
+            'metadata_errors': db.execute(
+                "SELECT COUNT(*) FROM media_items WHERE metadata_status='error'"
+            ).fetchone()[0],
+            'poster_errors': db.execute(
+                "SELECT COUNT(*) FROM media_items WHERE media_type='video' AND poster_status='error'"
+            ).fetchone()[0],
+            'embedding_errors': db.execute(
+                "SELECT COUNT(*) FROM media_items WHERE embedding_status='error'"
+            ).fetchone()[0],
             'metadata_done': db.execute(
                 "SELECT COUNT(*) FROM media_items WHERE metadata_status = 'ready'"
             ).fetchone()[0],
@@ -348,8 +390,17 @@ def admin():
             ).fetchone()[0],
         }
         jobs = db.execute('SELECT * FROM job_state ORDER BY job').fetchall()
-    return render_template('admin.html', users=users, scans=scans, stats=stats,
-                           jobs=jobs)
+        media_errors = db.execute(
+            "SELECT collection,subpath,preview_error,metadata_error,poster_status,embedding_status FROM media_items WHERE preview_status='error' OR metadata_status='error' OR poster_status='error' OR embedding_status='error' ORDER BY collection,subpath LIMIT 100"
+        ).fetchall()
+    return render_template(
+        'admin.html',
+        users=users,
+        scans=scans,
+        stats=stats,
+        jobs=jobs,
+        media_errors=media_errors,
+    )
 
 
 @bp.post('/admin/jobs/<job>')
@@ -357,6 +408,7 @@ def admin():
 def run_job(job):
     units = {
         'scan': 'nfs-image-viewer-index.service',
+        'previews': 'nfs-image-viewer-previews.service',
         'metadata': 'nfs-image-viewer-enrich.service',
         'posters': 'nfs-image-viewer-posters.service',
         'semantic': 'nfs-image-viewer-semantic-index.service',
@@ -367,7 +419,9 @@ def run_job(job):
         abort(404)
     result = subprocess.run(
         ['systemctl', '--user', 'start', '--no-block', unit],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     if result.returncode:
         flash(result.stderr.strip() or 'Could not start the job.', 'error')

@@ -3,21 +3,20 @@
 {% block body_class %}viewer-page{% endblock %}
 {% block content %}
 <div class="viewer-bar" id="viewerBar">
-  <a href="{{ url_for('browse', collection=collection, subpath=parent_subpath) }}" class="btn" id="backBtn">← <span>Back</span></a>
+  <a href="{{ return_to }}" class="btn" id="backBtn" aria-label="Back to gallery">← <span>Back</span></a>
   <span class="viewer-counter">{{ idx }} / {{ total }}</span><span class="viewer-filename">{{ filename }}</span>
-  <button type="button" class="btn fav-btn {% if is_favorite %}is-fav{% endif %}" id="favBtn" aria-pressed="{{ 'true' if is_favorite else 'false' }}"><span class="fav-icon">{{ '♥' if is_favorite else '♡' }}</span> <span>Favorite</span></button>
-  <div class="album-popover"><button type="button" class="btn" id="albumBtn">＋ <span>Album</span></button><div class="album-menu" id="albumMenu" hidden>
+  <button type="button" class="btn fav-btn {% if is_favorite %}is-fav{% endif %}" id="favBtn" aria-label="Toggle favorite" aria-pressed="{{ 'true' if is_favorite else 'false' }}"><span class="fav-icon">{{ '♥' if is_favorite else '♡' }}</span> <span>Favorite</span></button>
+  <div class="album-popover"><button type="button" class="btn" id="albumBtn" aria-label="Add to album">＋ <span>Album</span></button><div class="album-menu" id="albumMenu" hidden>
     {% if albums %}{% for album in albums %}<button type="button" data-album-id="{{ album.id }}" data-added="{{ 1 if album.contains else 0 }}"><span class="album-name">{{ album.name }}</span><span class="album-check">{{ '✓' if album.contains else '' }}</span></button>{% endfor %}{% else %}<a class="muted" href="{{ url_for('albums_page') }}">Create your first album</a>{% endif %}
   </div></div>
-  {% if not is_video %}<button type="button" class="btn" id="infoBtn">ⓘ <span>Info</span></button>{% endif %}
-  <button type="button" class="btn" id="slideshowBtn">▶ <span>Play</span></button>
-  <a href="{{ url_for('serve_image', collection=collection, subpath=subpath) }}" class="btn" download="{{ filename }}">↓ <span>Save</span></a>
+  <a class="btn" href="{{ url_for('serve_image',collection=collection,subpath=subpath) }}?download=1" aria-label="Download original">↓ <span>Download original</span></a>{% if not is_video %}<button type="button" class="btn" id="infoBtn" aria-label="Photo information">ⓘ <span>Info</span></button>{% endif %}
+  <button type="button" class="btn" id="slideshowBtn" aria-label="Play slideshow">▶ <span>Play</span></button>
 </div>
 {% if not is_video %}<div id="infoPanel" class="info-panel" hidden></div>{% endif %}
 <div class="viewer-wrap" id="viewerWrap">
-  {% if prev_path %}<a href="{{ url_for('view', collection=collection, subpath=prev_path) }}" class="nav-btn prev" id="prevBtn" aria-label="Previous">‹</a>{% endif %}
-  {% if is_video %}<video src="{{ url_for('serve_image', collection=collection, subpath=subpath) }}" class="viewer-img" id="mainImg" controls autoplay playsinline></video>{% else %}<img src="{{ url_for('serve_image', collection=collection, subpath=subpath) }}" class="viewer-img" alt="{{ filename }}" id="mainImg">{% endif %}
-  {% if next_path %}<a href="{{ url_for('view', collection=collection, subpath=next_path) }}" class="nav-btn next" id="nextBtn" aria-label="Next">›</a>{% endif %}
+  {% if prev_path %}<a href="{{ url_for('view', collection=collection, subpath=prev_path, return_to=return_to) }}" class="nav-btn prev" id="prevBtn" aria-label="Previous">‹</a>{% endif %}
+  {% if preview_notice %}<p role="status">{{ preview_notice }}</p>{% endif %}{% if is_video %}<video src="{{ url_for('serve_image', collection=collection, subpath=subpath) }}" class="viewer-img" id="mainImg" controls autoplay playsinline></video>{% else %}<img src="{{ url_for('serve_image', collection=collection, subpath=subpath) }}" class="viewer-img" alt="{{ filename }}" id="mainImg">{% endif %}
+  {% if next_path %}<a href="{{ url_for('view', collection=collection, subpath=next_path, return_to=return_to) }}" class="nav-btn next" id="nextBtn" aria-label="Next">›</a>{% endif %}
 </div>
 {% endblock %}
 {% block scripts %}<script>

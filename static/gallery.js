@@ -1,4 +1,4 @@
-const VIDEO_EXTS = ['.mp4', '.mov', '.m4v', '.webm'];
+const VIDEO_EXTS = ['.mp4', '.mov', '.m4v', '.webm', '.avi'];
 
 function isVideo(name) {
   return VIDEO_EXTS.some(ext => name.toLowerCase().endsWith(ext));
@@ -33,16 +33,15 @@ async function apiFetch(url, options = {}) {
 }
 
 function lazyLoadThumbs(root = document) {
-  const images = root.querySelectorAll('img.lazy-thumb:not([data-observed])');
+  const images = root.querySelectorAll('img.lazy-thumb[data-src]:not([data-observed])');
   if (!('IntersectionObserver' in window)) {
-    images.forEach(img => { img.src = img.dataset.src; if (img.dataset.srcset) img.srcset = img.dataset.srcset; });
+    images.forEach(img => { img.src = img.dataset.src; });
     return null;
   }
   const observer = new IntersectionObserver((entries, obs) => {
     entries.forEach(entry => {
       if (!entry.isIntersecting) return;
       entry.target.src = entry.target.dataset.src;
-      if (entry.target.dataset.srcset) entry.target.srcset = entry.target.dataset.srcset;
       obs.unobserve(entry.target);
     });
   }, { rootMargin: '500px' });
@@ -54,26 +53,24 @@ function makeThumbCard(opts) {
   const card = document.createElement('article');
   card.className = 'media-card';
   const link = document.createElement('a');
-  link.href = opts.href;
+  const viewerUrl = new URL(opts.href, location.href);
+  if (viewerUrl.origin === location.origin && viewerUrl.pathname.startsWith('/view/')) {
+    viewerUrl.searchParams.set('return_to', location.pathname + location.search);
+  }
+  link.href = viewerUrl.href;
   link.className = 'thumb-card';
   if (opts.title) link.title = opts.title;
 
   const img = document.createElement('img');
   img.className = 'lazy-thumb';
   img.dataset.src = opts.thumbSrc;
-  if (!opts.video && opts.responsive !== false) {
-    const join = opts.thumbSrc.includes('?') ? '&' : '?';
-    img.dataset.srcset = `${opts.thumbSrc}${join}size=240 240w, ${opts.thumbSrc}${join}size=400 400w, ${opts.thumbSrc}${join}size=800 800w`;
-    img.sizes = '(max-width: 430px) 50vw, (max-width: 700px) 33vw, 200px';
-  }
   img.alt = opts.title || '';
   img.loading = 'lazy';
   img.decoding = 'async';
   img.onerror = () => {
-    if (!opts.video) return;
     const placeholder = document.createElement('div');
     placeholder.className = 'folder-placeholder';
-    placeholder.textContent = '▶';
+    placeholder.textContent = opts.video ? '▶' : 'Preview unavailable';
     img.replaceWith(placeholder);
   };
   link.appendChild(img);
@@ -164,14 +161,26 @@ function showToast(message, type = 'success') {
   setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 250); }, 2600);
 }
 
+function restoreGalleryScroll() {
+  const key = 'scroll:' + location.pathname + location.search;
+  let saved;
+  try { saved = sessionStorage.getItem(key); } catch { return; }
+  if (saved === null) return;
+  // Async views call this after rendering cards, when the page has its real height.
+  requestAnimationFrame(() => scrollTo({ top: Number(saved), behavior: 'instant' }));
+}
+
 function rememberScroll() {
   document.addEventListener('click', event => {
-    if (event.target.closest('.thumb-card, .folder-card')) {
-      sessionStorage.setItem('scroll:' + location.pathname + location.search, String(scrollY));
+    if (event.target.closest('.thumb-card, .folder-card, .album-card')) {
+      try {
+        sessionStorage.setItem('scroll:' + location.pathname + location.search, String(scrollY));
+      } catch { /* Browsing still works when storage is unavailable. */ }
     }
   });
-  const saved = sessionStorage.getItem('scroll:' + location.pathname + location.search);
-  if (saved) requestAnimationFrame(() => scrollTo(0, Number(saved)));
+  restoreGalleryScroll();
 }
 
 document.addEventListener('DOMContentLoaded', rememberScroll);
+
+document.addEventListener('DOMContentLoaded',()=>document.querySelectorAll('.album-cover img').forEach(img=>{img.addEventListener('error',()=>{const fallback=document.createElement('div');fallback.className='album-placeholder';fallback.textContent='▣';img.replaceWith(fallback);},{once:true});}));

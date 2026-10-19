@@ -10,8 +10,8 @@
   <title>{% block title %}Lumina{% endblock %}</title>
   <link rel="manifest" href="{{ url_for('manifest') }}">
   <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <script src="{{ url_for('static', filename='gallery.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css',v='20261019-browse') }}">
+  <script src="{{ url_for('static', filename='gallery.js',v='20261019-thumbs400') }}"></script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
   <header class="topbar">
@@ -21,10 +21,10 @@
     </a>
     {% if current_user %}
     <nav class="desktop-nav" aria-label="Main navigation">
-      <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Library</a>
+      <a href="{{ url_for('index') }}" class="{% if request.endpoint in ('index','library_albums_page','browse','view') %}active{% endif %}">Library</a>
       <a href="{{ url_for('global_search_page') }}" class="{% if 'search' in request.endpoint %}active{% endif %}">Search</a>
       <a href="{{ url_for('favorites_page') }}" class="{% if request.endpoint == 'favorites_page' %}active{% endif %}">Favorites</a>
-      <a href="{{ url_for('albums_page') }}" class="{% if 'album' in request.endpoint %}active{% endif %}">Albums</a>
+      <a href="{{ url_for('albums_page') }}" class="{% if request.endpoint in ('albums_page','album_page') %}active{% endif %}">My albums</a>
     </nav>
     <div class="account-menu">
       {% if current_user.role == 'admin' %}<a href="{{ url_for('auth.admin') }}" class="icon-link" title="Admin">Admin</a>{% endif %}
@@ -36,10 +36,10 @@
   <main class="page-shell {% block main_class %}{% endblock %}">{% block content %}{% endblock %}</main>
   {% if current_user %}
   <nav class="mobile-nav" aria-label="Mobile navigation">
-    <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}"><span>⌂</span>Library</a>
+    <a href="{{ url_for('index') }}" class="{% if request.endpoint in ('index','library_albums_page','browse','view') %}active{% endif %}"><span>⌂</span>Library</a>
     <a href="{{ url_for('global_search_page') }}" class="{% if 'search' in request.endpoint %}active{% endif %}"><span>⌕</span>Search</a>
     <a href="{{ url_for('favorites_page') }}" class="{% if request.endpoint == 'favorites_page' %}active{% endif %}"><span>♥</span>Favorites</a>
-    <a href="{{ url_for('albums_page') }}" class="{% if 'album' in request.endpoint %}active{% endif %}"><span>▣</span>Albums</a>
+    <a href="{{ url_for('albums_page') }}" class="{% if request.endpoint in ('albums_page','album_page') %}active{% endif %}"><span>▣</span>My albums</a>
   </nav>
   {% endif %}
   <script>if (window.isSecureContext && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>

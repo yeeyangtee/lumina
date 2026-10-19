@@ -55,8 +55,8 @@ Status: ☐ todo · ◐ building/indexing · ☑ shipped · ⏸ intentionally on
 - ☑ Touch-native viewer with swipe navigation, pinch zoom, double-tap zoom,
   panning, full-screen controls, and automatic control hiding.
 - ☑ Grid scroll-position restoration after returning from the viewer.
-- ☑ Responsive 240/400/800px thumbnails with srcset, lazy loading, and atomic
-  local cache publication.
+- ☑ Lazy thumbnails with atomic local cache publication; standardized on a single
+  400px image-thumbnail size by owner decision on 2026-10-19.
 - ☑ Web manifest, maskable SVG icon, and conservative static-only service worker.
 - ⏸ Service-worker activation on LAN IP requires trusted local HTTPS; the HTTP app
   remains fully usable and can still be added as a home-screen shortcut.
@@ -77,19 +77,69 @@ Status: ☐ todo · ◐ building/indexing · ☑ shipped · ⏸ intentionally on
 - ⏸ Friendly local HTTPS requires installing a trusted local CA on every client;
   defer until the owner wants that device-management tradeoff.
 
-## Review-build acceptance
+## Wave 5 — Organized NAS integration ☑
 
-- ☑ Live at http://192.168.0.110:5050.
-- ☑ One-time admin setup completed; the owner account exists.
-- ☑ Existing media catalogue preserved: 23,385 items.
-- ☑ Pre-migration and post-migration verified database backups exist.
-- ☑ Core test suite, template compilation, JavaScript syntax, health, and live
-  semantic query checks pass.
-- ☑ First-pass derived data completed. Exceptional files remain isolated in error
-  state without blocking normal browsing or review.
+- ☑ Canonical Travel, Events, Family Photos and Uncategorized roots.
+- ☑ 44 shared source albums from validated album.json, stable UUIDs and subfolder notes.
+- ☑ Separate private My albums and Favorites; owner account/session preserved.
+- ☑ CR2/TIFF display and AVI/legacy MOV playback copies kept local; originals unchanged.
+- ☑ Sixteen separately catalogued audio recordings; unknown-year photos preserved.
+- ☑ Atomic scans with mount, link, invalid-metadata and pruning safeguards.
+- ☑ Reconciliation of 26,062 visual items, 44 albums and 16 audio files.
+- ☑ Historical derivative reuse through reviewed aliases and exact version matching.
+- ☑ Persistent preview/error visibility and bounded resumable workers.
+- ☑ Isolated regressions and desktop/mobile browser checks across representative formats.
+- ☑ Full derived-data pass: 26,038 previews/search embeddings ready; 24 unreadable JPEGs explicitly reported, originals retained. All 1,621 video posters and 26,062 metadata rows ready.
+- ☑ Owner's MacBook usability review accepted on 2026-10-19.
+- ☐ Owner's phone usability review.
+- ⏸ New media-backup schedules, retention and off-site work explicitly deferred.
+
+The September Wave 1–4 counts above are historical milestones, not current
+coverage. See HANDOVER.md and Admin for the current checkpoint and processing
+states. The existing verified SSD media copy is accepted for now.
+
+## Browse refinements — October 2026
+
+- ☑ Compact home layout and consistent album-cover cards within collections.
+- ☑ Native lazy-loaded album covers and corrected folder-cover lazy loading.
+- ☑ Numbered folder pages with 100 photos/videos, direct page links and controls
+  above and below the grid; no automatic scrolling.
+- ☑ Viewer return links preserve the originating page/sort through previous/next;
+  folder scroll restores after asynchronous rendering.
+- ☑ Larger mobile control targets and a single original-download action.
+- ☑ Single 400px image-thumbnail size; retain existing 240/800px cache files.
+- ☐ Four-image album covers: explore a 2×2 collage, selection across the album
+  rather than just its first file, and fallback for fewer than four usable photos.
+  Reuse local 400px thumbnails and catalogue queries; no recursive NAS work in
+  page requests. Current library covers use the first image by full relative
+  path, or the first video's poster when no image exists.
+- ☐ Sharper thumbnails: require adequate embedded-preview resolution and prepare
+  better 400px thumbnails in the background. Existing quality remains unchanged;
+  benchmark a representative batch before a library-wide upgrade.
+- ☐ Automatic rotation/orientation correction beyond existing EXIF handling;
+  define desired behavior before implementation.
+- ☐ Automatic duplicate detection/deduplication and similar-photo grouping;
+  agree keeper/removal behavior before any changes to originals.
 
 ## Changelog
 
+- **2026-10-19 — accepted checkpoint:** owner approved the app on MacBook and
+  requested a Git checkpoint of the organized-library integration and browsing
+  refinements. Phone acceptance remains pending. Four-image album cards added
+  to future work, without changing current cover selection.
+- **2026-10-19 — thumbnail size:** standardized image thumbnails on 400px,
+  removed responsive variant requests and normalized legacy size requests to
+  400px. Existing caches are retained; no quality rebuild was started.
+- **2026-10-19 — browsing refinements:** simplified the home and album views,
+  restored album covers within collections, increased numbered folder pages to
+  100 items and preserved viewer return context/scroll. Improved mobile controls
+  and consolidated original downloads. Thumbnail-quality upgrades, automatic
+  rotation and duplicate/similar-photo handling remain future work.
+- **2026-10-18 — organized NAS integration:** deployed canonical roots, 44 shared
+  source albums, legacy-format display/playback, audio attachments, owner date
+  handling, atomic scan guards, version-matched cache reuse and isolated browser
+  tests. Accounts and originals are preserved. Source cleanup is recorded in the
+  data-management journals; new media-backup policy work is deferred by the owner.
 - **2026-09-07 — project rename:** moved the source folder to
   `/home/yeeyang/projects/lumina`, updated all deployment paths, and preserved
   the local Git history.

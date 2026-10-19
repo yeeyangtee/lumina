@@ -1,146 +1,109 @@
 # Lumina
 
-Lumina is a private, fast, mobile-first photo and video library for media stored
-on the home NAS. It runs continuously on **yy-visionmini**, accepts local-network
-clients only, and keeps all catalogue, account, and ML data on the machine.
+A private photo/video browser for the organized NAS library. Open
+**http://192.168.0.110:5050** and sign in with the existing owner account.
 
-Open: **http://192.168.0.110:5050**
+The Library opens Travel, Events and Family Photos. **Library albums** shows the
+reviewed album titles, dates, descriptions and subfolders from `album.json`.
+**My albums** and Favorites are private personal lists; neither moves files.
+Uncategorized is a separate entry, and undated childhood photos stay undated.
 
-## First review
+Collection pages show the same album-cover cards as Library albums. Folder grids
+use numbered pages of 100 photos/videos, with page links above and below the grid.
+Closing the viewer returns to the originating page and sort, with folder scroll
+restored after the grid loads. The viewer offers one original-download action.
 
-Initial administrator setup has been completed on yy-visionmini. Sign in with the
-account created by the owner. On a fresh installation, the first visit instead
-opens the one-time setup screen; its password minimum is eight characters and
-there is no public registration.
+## Media and performance
 
-After setup:
+Originals stay on the NAS. Catalogue, album metadata, thumbnails, video posters,
+playback copies and visual-search embeddings stay on yy-visionmini. No photo,
+search phrase or embedding is sent to a cloud API. Model weights are downloaded
+once and reused locally.
 
-- Library shows collection totals and recent memories.
-- Search supports filenames, folders, collection, year, type, camera, favorites,
-  and visual-meaning queries.
-- Hearts are private to each account.
-- Albums organize media without changing files on the NAS.
-- Admin shows users, scans, background processing coverage, and job controls.
-- Account lets each user change their password and sign out.
+JPEG/PNG/HEIC/GIF and the existing image types are supported, along with Canon
+CR2, TIFF/TIF, MP4, MOV and AVI. CR2 embedded JPEGs and TIFFs get local JPEG display
+copies; AVI and incompatible MOV files get local MP4 playback copies. Downloads
+always offer the original. HEVC originals require a browser with HEVC support.
+Sixteen childhood WAV recordings are accessible separately as audio, outside
+visual-search counts. Nonmedia scripts are not indexed or executed.
 
-The initial metadata, visual-search, and video-poster passes are complete. A small
-set of unreadable media remains in explicit error state and uses normal fallback
-behavior; see `ROADMAP.md` for current counts.
+A first run can show previews as pending while the background worker runs. Admin
+reports ready/pending/error totals and files needing attention. Invalid media
+stays available for original download; errors do not block the rest of the
+library. Covers and searches use the local catalogue. Folder browsing performs
+one NAS listing, never a recursive request-path traversal.
 
-## Mobile use
+Image thumbnails use one 400px bounding size for grids and image album covers.
+The hourly worker prepares new/changed photos; cache misses can also be generated
+on demand. Smaller embedded EXIF previews may still be used. The former 240/800px
+variants are no longer requested or generated; existing cache files are retained.
 
-The mobile layout has bottom navigation and a full-screen viewer. Swipe left or
-right to navigate, pinch or double-tap to zoom, and drag while zoomed. Viewer
-controls fade after a few seconds and return on tap.
+## Configuration and operation
 
-The manifest and application icon support a home-screen shortcut. Static offline
-caching activates only in a secure context; the current HTTP LAN address remains
-fully functional but does not qualify for service-worker installation in all
-browsers.
+Production source: `/home/yeeyang/projects/lumina`. Use Python 3.12 and the
+existing `.venv`. Shared configuration is environment-driven:
 
-## Architecture
+- `NFS_VIEWER_MEDIA_ROOT`: parent of `media/`, normally `/mnt/yeeyang`.
+- `NFS_VIEWER_COLLECTIONS_JSON`: explicit mapping, overriding defaults.
+- `NFS_VIEWER_DATA_DIR`: local app state, normally `~/.cache/nfs_image_viewer`.
+- Existing bind, trusted-network and MobileCLIP settings remain supported.
 
-- Project source: `/home/yeeyang/projects/lumina`.
-- Flask/Gunicorn web app: port 5050.
-- SQLite catalogue: ~/.cache/nfs_image_viewer/library.db.
-- SMB share: //192.168.0.12/yeeyang at /mnt/yeeyang.
-- Semantic service: MobileCLIP-S1 on loopback port 5051.
-- Derived assets: local thumbnails and video posters.
-- Scheduled work: media scan, EXIF enrichment, posters, embeddings, backups.
+Production overrides live in the private `~/.config/nfs-image-viewer/env`.
+Do not print or commit its contents, account hashes or NAS/session credentials.
 
-No photo, embedding, search phrase, or account data is sent to a cloud API.
-OpenCLIP model weights are downloaded once and used locally.
-
-## Production services
+Services are user systemd units under `deploy/`:
 
     systemctl --user status nfs-image-viewer.service
     systemctl --user status nfs-image-viewer-semantic.service
     systemctl --user list-timers 'nfs-image-viewer-*'
-    journalctl --user -u nfs-image-viewer.service -n 100 --no-pager
-
-Background units:
-
-- nfs-image-viewer-index — discover files every 15 minutes.
-- nfs-image-viewer-enrich — read metadata every 30 minutes.
-- nfs-image-viewer-posters — extract poster frames hourly.
-- nfs-image-viewer-semantic-index — build embeddings hourly.
-- nfs-image-viewer-backup — verified database backup daily.
-
-Administrators can also start these jobs from the Admin screen.
-
-## Install dependencies
-
-The production environment uses Python 3.12 and CPU-only PyTorch:
-
-    uv venv --python /usr/bin/python3.12 .venv
-    uv pip install --python .venv/bin/python -r requirements-ml.txt
-    uv pip install --python .venv/bin/python -r requirements.txt
-
-Run locally:
-
-    .venv/bin/python scanner.py
-    .venv/bin/python app.py
-
-The development server listens on 127.0.0.1:5050 with debug mode disabled.
-
-## NAS mount
-
-The persistent /etc/fstab entry on yy-visionmini mounts:
-
-    //192.168.0.12/yeeyang /mnt/yeeyang cifs credentials=/home/yeeyang/.smbcredentials,uid=yeeyang,gid=yeeyang,file_mode=0600,dir_mode=0700,vers=3.0,nosuid,nodev,noexec,nofail,_netdev,x-systemd.automount 0 0
-
-The credentials file is mode 0600 and contains the NAS account. Never commit or
-print its password.
-
-Verify:
-
-    findmnt /mnt/yeeyang
     curl http://127.0.0.1:5050/healthz
+    curl http://127.0.0.1:5051/healthz
 
-## Configuration
+Indexing, previews, metadata, posters and embeddings have separate services and
+timers. After a reviewed rescan, a full resumable preparation pass is:
 
-Optional KEY=value overrides live in ~/.config/nfs-image-viewer/env. See
-deploy/env.example. Supported settings include:
+    .venv/bin/python integration_jobs.py
 
-- NFS_VIEWER_MEDIA_ROOT
-- NFS_VIEWER_COLLECTIONS_JSON
-- NFS_VIEWER_DATA_DIR
-- NFS_VIEWER_BIND
-- NFS_VIEWER_TRUSTED_NETWORKS
-- NFS_VIEWER_CLIP_MODEL
-- NFS_VIEWER_CLIP_PRETRAINED
-- NFS_VIEWER_ML_THREADS
+Integration and per-worker advisory locks serialize overlapping invocations.
+Worker commands and bounded retry procedure are in `HANDOVER.md`. Only use
+`scanner.py --allow-prune` after reviewing missing albums/large reductions.
+Scanner errors or an unexpected empty source preserve the previous catalogue.
 
-UFW is intentionally not enabled at the owner's request. The application-level
-private-network CIDR check remains active. Do not add router port forwarding.
+The NAS mount remains the existing CIFS mount. Deployment must verify that its
+source is `//192.168.0.12/yeeyang`; no mount/permission changes are needed here.
+LAN-only access remains active. Trusted HTTPS and firewall policy remain deferred.
 
-## Backups and recovery
+## Backups
 
-Verified online backups are stored under:
+The current NAS-media backup is the verified SSD Restic repository managed by
+the data-management project. The owner plans to keep the SSD offline after that
+broader task is finished. New media-backup scheduling, retention and off-site
+work are explicitly deferred.
 
-    ~/.cache/nfs_image_viewer/backups/library-YYYYMMDD-HHMMSS.db
+Lumina's pre-existing daily local SQLite backups retain fourteen copies under
+`~/.cache/nfs_image_viewer/backups`. This separate policy is unchanged. Before a
+schema/deployment migration, create a dedicated verified SQLite online backup
+without pruning prior copies. Thumbnails/posters/playback copies can be rebuilt;
+accounts and the session key need careful preservation. Follow `HANDOVER.md`
+for a stopped-writer WAL-safe rollback; never overwrite a live database.
 
-Up to fourteen scheduled copies are retained. A pre-wave migration snapshot is
-also kept. To make a fresh backup:
-
-    systemctl --user start nfs-image-viewer-backup.service
-
-Before restoring, stop the web and all database-writing jobs, preserve the current
-library.db, copy the selected verified backup into its place with mode 0600, and
-restart the services. Do not restore while an index/enrichment job is running.
-These backups are stored on the same machine as the live database; copy them to a
-second trusted device if protection from disk or machine loss is required.
-
-## Tests
+## Development checks
 
     .venv/bin/python -m unittest discover -s tests -v
-    .venv/bin/python -m py_compile app.py auth.py catalog.py scanner.py enrich.py
+    .venv/bin/python tests/integration_checks.py -v
+    .venv/bin/python -m py_compile app.py auth.py catalog.py config.py scanner.py \
+      enrich.py previews.py library_metadata.py formats.py posters.py \
+      semantic_index.py reuse_archive_cache.py integration_jobs.py job_lock.py
     node --check static/gallery.js
+    node --check static/sw.js
 
-The tests use isolated temporary media and data directories; they never touch the
-production catalogue.
+Compile every Jinja template with isolated `NFS_VIEWER_MEDIA_ROOT` and
+`NFS_VIEWER_DATA_DIR` before importing `app`. Tests must never use production
+SQLite or its media roots. The standalone integration suite exercises invalid and
+interrupted scans, links, UUID collisions, missing albums, private-list
+preservation, RAW/TIFF previews, AVI range playback, audio and unknown dates.
 
-## Current status
-
-See `ROADMAP.md` for shipped and deferred product work. Maintainers and future AI
-agents should begin with `HANDOVER.md`, then read `AGENTS.md` before editing.
+Read `HANDOVER.md` and `AGENTS.md` before maintenance. `ROADMAP.md` records shipped
+features and deferred scope. The browser pilot covers Chromium desktop/mobile;
+the owner accepted MacBook usability on 2026-10-19; phone gestures and any further
+browser-specific review remain pending.

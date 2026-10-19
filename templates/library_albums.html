@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Library albums — Lumina{% endblock %}
+{% block content %}
+<div class="page-title"><div><h1>Library albums</h1><p class="lede">{{ source_albums|length }} albums across your collections.</p></div></div>
+{% for category, category_albums in source_albums|groupby('collection') %}
+<section class="library-album-section" aria-labelledby="category-{{ loop.index }}">
+  <div class="section-head"><h2 id="category-{{ loop.index }}">{{ category.replace('_', ' ').title() }}</h2><a class="btn subtle" href="{{ url_for('browse', collection=category) }}">Open collection <span aria-hidden="true">→</span></a></div>
+  {% with source_albums=category_albums %}{% include '_library_album_cards.html' %}{% endwith %}
+</section>
+{% else %}
+<p class="empty">Library albums will appear here once your collections are indexed.</p>
+{% endfor %}
+{% endblock %}
