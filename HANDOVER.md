@@ -6,6 +6,16 @@ code/documentation review before their final browser review.
 
 ## Paused at owner-requested checkpoint — 2026-10-19
 
+The owner subsequently authorized linking and pushing to
+`https://github.com/yeeyangtee/lumina.git`. `origin/main` now tracks the accepted
+checkpoint. At their request, the old detached integration worktree was reviewed
+and removed; its integration is already included in the accepted main history,
+with later UI/thumbnail refinements superseding its older versions. Its exact
+contents (including ignored files), staged/unstaged patches and verified SHA256
+manifest were preserved privately under
+`~/.cache/nfs_image_viewer/reviews/worktree-cleanup-20261019-235659/`.
+Only the production checkout and main branch remain; existing tags are retained.
+
 The owner accepted the completed full-library 400px rollout ("looks good") and
 requested a checkpoint before pausing work. The local Git commit titled
 `checkpoint: accepted full-library 400px thumbnails` captures the quality
@@ -213,11 +223,13 @@ coverage recorded below. These are dated observations, not permanent guarantees.
 
 The deployed integration and browsing refinements are checkpointed in
 `/home/yeeyang/projects/lumina`. Preserve any later modified and untracked files;
-do not reset, clean, recreate the checkout or discard app state. The isolated build
-worktree is `/home/yeeyang/data-management/worktrees/lumina-integration`, based
-on `61cbe12`. It was byte-matched to the deployed implementation at handoff.
-The live checkout subsequently gained browsing/UI/400px-thumbnail changes and
-expanded documentation; do not copy the older worktree over production.
+do not reset, clean, recreate the checkout or discard app state. The former
+isolated build worktree at
+`/home/yeeyang/data-management/worktrees/lumina-integration`, based on `61cbe12`,
+was archived and removed during the owner-requested cleanup recorded above.
+It was byte-matched to the deployed integration at the earlier handoff; the live
+checkout subsequently gained browsing/UI/400px-thumbnail changes and expanded
+documentation. Do not restore the older archive over production.
 
 Suggested next steps, in order:
 
